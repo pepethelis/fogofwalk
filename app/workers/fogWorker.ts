@@ -19,8 +19,8 @@ function worldFog(): Feature<Polygon> {
   return polygon([[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]])
 }
 
-// For fill mode: remove inner rings so a closed-loop buffer becomes a filled polygon.
-// @turf/buffer on a looping line returns an annulus; stripping inner rings forces fill behavior.
+// Removes inner rings from a polygon/multipolygon so that a closed-loop buffer
+// becomes a filled shape. Used in fill mode to clear loop interiors.
 function stripInnerRings(feat: FogFeature): FogFeature {
   const geo = feat.geometry
   if (geo.type === "Polygon") {
@@ -34,16 +34,29 @@ function stripInnerRings(feat: FogFeature): FogFeature {
   }
 }
 
+// Corridor mode: fog maintained incrementally via difference
 let fogPolygon: FogFeature = worldFog()
-// Buffers accumulated since the last fog update — applied in one batch at emit time.
+// Corridor mode: track buffers batched since last emit, applied once per flush
 let pendingBuffer: FogFeature | null = null
+// Fill mode: cumulative union of ALL track buffers since last RESET.
+// Never cleared between emits so loops formed across any number of files are detected.
+let accumulated: FogFeature | null = null
+
 let processedCount = 0
 let lastEmitTime = 0
 
-function flushAndEmit() {
-  if (pendingBuffer) {
-    fogPolygon = difference(featureCollection([fogPolygon, pendingBuffer])) ?? fogPolygon
-    pendingBuffer = null
+function flushAndEmit(mode: FogMode) {
+  if (mode === "corridor") {
+    if (pendingBuffer) {
+      fogPolygon = difference(featureCollection([fogPolygon, pendingBuffer])) ?? fogPolygon
+      pendingBuffer = null
+    }
+  } else {
+    // Recompute fog from the full accumulated union each time, stripping inner rings
+    // at the last moment. This catches loops formed by any combination of files/batches.
+    fogPolygon = accumulated
+      ? difference(featureCollection([worldFog(), stripInnerRings(accumulated)])) ?? worldFog()
+      : worldFog()
   }
   const msg: WorkerOutboundMessage = { type: "FOG_UPDATE", fogData: fogPolygon, processedCount }
   self.postMessage(msg)
@@ -56,6 +69,7 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
   if (msg.type === "RESET") {
     fogPolygon = worldFog()
     pendingBuffer = null
+    accumulated = null
     processedCount = 0
     lastEmitTime = 0
     self.postMessage({
@@ -96,16 +110,17 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
         })
         const buf = buffer(simplified, FOG_CLEAR_RADIUS_METERS, { units: "meters" })
         if (buf) {
-          // Corridor: use buffer as-is — @turf/buffer returns an annulus for closed loops,
-          // so difference correctly clears only the path corridor.
-          // Fill: strip inner rings to force the annulus into a filled polygon.
-          const trackBuf = mode === "fill"
-            ? stripInnerRings(buf as FogFeature)
-            : (buf as FogFeature)
-
-          pendingBuffer = pendingBuffer
-            ? (union(featureCollection([pendingBuffer, trackBuf])) ?? pendingBuffer)
-            : trackBuf
+          if (mode === "corridor") {
+            pendingBuffer = pendingBuffer
+              ? (union(featureCollection([pendingBuffer, buf as FogFeature])) ?? pendingBuffer)
+              : (buf as FogFeature)
+          } else {
+            // Accumulate without stripping — inner rings are preserved so the
+            // full union can detect loops formed across multiple files.
+            accumulated = accumulated
+              ? (union(featureCollection([accumulated, buf as FogFeature])) ?? accumulated)
+              : (buf as FogFeature)
+          }
         }
       } catch (err) {
         console.debug("[worker] error processing track", track.name, err)
@@ -113,11 +128,11 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
 
       processedCount++
       if (performance.now() - lastEmitTime >= FOG_EMIT_INTERVAL_MS) {
-        flushAndEmit()
+        flushAndEmit(mode)
       }
     }
 
-    flushAndEmit()
+    flushAndEmit(mode)
     const doneMsg: WorkerOutboundMessage = { type: "DONE", processedCount }
     console.debug("[worker] DONE", { processedCount })
     self.postMessage(doneMsg)
