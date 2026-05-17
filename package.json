@@ -18,6 +18,7 @@
     "@tmcw/togeojson": "^7.1.2",
     "@turf/bbox": "^7.3.5",
     "@turf/buffer": "^7.3.5",
+    "@turf/difference": "^7.3.5",
     "@turf/helpers": "^7.3.5",
     "@turf/simplify": "^7.3.5",
     "@turf/union": "^7.3.5",

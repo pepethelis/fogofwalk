@@ -1,8 +1,9 @@
 import { useRef } from "react"
-import { Plus, Trash, MapTrifold } from "@phosphor-icons/react"
+import { Plus, Trash, MapTrifold, Path } from "@phosphor-icons/react"
 import { Button } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
 import { Switch } from "~/components/ui/switch"
+import type { FogMode } from "~/types/tracks"
 
 interface ControlPanelProps {
   trackCount: number
@@ -10,6 +11,8 @@ interface ControlPanelProps {
   isProcessing: boolean
   showTracks: boolean
   onShowTracksChange: (value: boolean) => void
+  fogMode: FogMode
+  onFogModeChange: (mode: FogMode) => void
   onAddFiles: (files: FileList) => void
   onClearAll: () => void
 }
@@ -20,6 +23,8 @@ export function ControlPanel({
   isProcessing,
   showTracks,
   onShowTracksChange,
+  fogMode,
+  onFogModeChange,
   onAddFiles,
   onClearAll,
 }: ControlPanelProps) {
@@ -74,6 +79,20 @@ export function ControlPanel({
         />
         <label htmlFor="show-tracks" className="text-sm text-muted-foreground cursor-pointer select-none">
           Tracks
+        </label>
+      </div>
+
+      <div className="h-5 w-px bg-border" />
+
+      <div className="flex items-center gap-2">
+        <Path weight="duotone" className="text-muted-foreground" size={16} />
+        <Switch
+          id="fog-mode"
+          checked={fogMode === "fill"}
+          onCheckedChange={(checked) => onFogModeChange(checked ? "fill" : "corridor")}
+        />
+        <label htmlFor="fog-mode" className="text-sm text-muted-foreground cursor-pointer select-none">
+          Fill loops
         </label>
       </div>
 

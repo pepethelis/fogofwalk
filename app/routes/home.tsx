@@ -6,9 +6,9 @@ import type { Route } from "./+types/home"
 import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
-import { mapStore, buildFogGeoJSON } from "~/lib/mapStore"
+import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
-import type { ParsedTrack } from "~/types/tracks"
+import type { FogMode, ParsedTrack } from "~/types/tracks"
 
 export async function clientLoader(): Promise<{ initialized: boolean }> {
   if (!mapStore.worker) {
@@ -30,8 +30,10 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
   if (intent === "add-files") {
     const files = formData.getAll("files") as File[]
+    const mode = formData.get("mode") as FogMode
     console.debug("[clientAction] add-files", {
       fileCount: files.length,
+      mode,
       files: files.map((f) => f.name),
     })
     const allTracks: ParsedTrack[] = []
@@ -59,11 +61,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     )
     if (allTracks.length > 0) {
       mapStore.tracks.push(...allTracks)
-      console.log("[clientAction] allTracks", allTracks)
-      mapStore.worker?.postMessage({
-        type: "PROCESS_TRACKS",
-        tracks: allTracks,
-      })
+      mapStore.worker?.postMessage({ type: "PROCESS_TRACKS", tracks: allTracks, mode })
     }
     return {
       intent: "add-files" as const,
@@ -73,14 +71,14 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   }
 
   if (intent === "clear-all") {
-    mapStore.fogHoles = []
+    mapStore.fogData = null
     mapStore.tracks = []
     mapStore.processedCount = 0
     mapStore.worker?.postMessage({ type: "RESET" })
     const map = mapStore.map
     if (map && mapStore.sourcesReady) {
       ;(map.getSource("fog-source") as maplibregl.GeoJSONSource)?.setData(
-        buildFogGeoJSON([])
+        worldFogGeoJSON()
       )
       ;(map.getSource("tracks-source") as maplibregl.GeoJSONSource)?.setData(
         featureCollection([])
@@ -100,6 +98,7 @@ export default function Home() {
   const [processedCount, setProcessedCount] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showTracks, setShowTracks] = useState(true)
+  const [fogMode, setFogMode] = useState<FogMode>("corridor")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
 
@@ -127,9 +126,10 @@ export default function Home() {
     }
   }, [fetcher.data])
 
-  function handleAddFiles(files: FileList) {
+  function handleAddFiles(files: FileList, mode: FogMode = fogMode) {
     const formData = new FormData()
     formData.append("intent", "add-files")
+    formData.append("mode", mode)
     for (const file of files) formData.append("files", file)
     fetcher.submit(formData, { method: "post", encType: "multipart/form-data" })
   }
@@ -138,6 +138,20 @@ export default function Home() {
     const formData = new FormData()
     formData.append("intent", "clear-all")
     fetcher.submit(formData, { method: "post" })
+  }
+
+  function handleFogModeChange(newMode: FogMode) {
+    setFogMode(newMode)
+    if (mapStore.tracks.length === 0) return
+    // Reset worker and re-process all stored tracks with the new mode
+    mapStore.worker?.postMessage({ type: "RESET" })
+    setIsProcessing(true)
+    setProcessedCount(0)
+    mapStore.worker?.postMessage({
+      type: "PROCESS_TRACKS",
+      tracks: mapStore.tracks,
+      mode: newMode,
+    })
   }
 
   function handleProcessingUpdate(count: number, done: boolean) {
@@ -163,13 +177,15 @@ export default function Home() {
             isProcessing={isProcessing}
             showTracks={showTracks}
             onShowTracksChange={setShowTracks}
+            fogMode={fogMode}
+            onFogModeChange={handleFogModeChange}
             onAddFiles={handleAddFiles}
             onClearAll={handleClearAll}
           />
           <FileUploadDialog
             open={showUploadDialog}
             onOpenChange={setShowUploadDialog}
-            onAddFiles={handleAddFiles}
+            onAddFiles={(files) => handleAddFiles(files, fogMode)}
           />
         </>
       )}

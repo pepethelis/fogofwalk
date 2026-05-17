@@ -4,7 +4,7 @@ import type { ParsedTrack } from "~/types/tracks"
 interface MapStore {
   map: maplibregl.Map | null
   worker: Worker | null
-  fogHoles: GeoJSON.Position[][]
+  fogData: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null
   tracks: ParsedTrack[]
   isProcessing: boolean
   processedCount: number
@@ -14,16 +14,14 @@ interface MapStore {
 export const mapStore: MapStore = {
   map: null,
   worker: null,
-  fogHoles: [],
+  fogData: null,
   tracks: [],
   isProcessing: false,
   processedCount: 0,
   sourcesReady: false,
 }
 
-export function buildFogGeoJSON(
-  holes: GeoJSON.Position[][],
-): GeoJSON.Feature<GeoJSON.Polygon> {
+export function worldFogGeoJSON(): GeoJSON.Feature<GeoJSON.Polygon> {
   return {
     type: "Feature",
     geometry: {
@@ -36,7 +34,6 @@ export function buildFogGeoJSON(
           [-180, 90],
           [-180, -90],
         ],
-        ...holes,
       ],
     },
     properties: {},

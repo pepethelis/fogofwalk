@@ -4,7 +4,7 @@ import { Protocol } from "pmtiles"
 import bbox from "@turf/bbox"
 import { featureCollection, lineString } from "@turf/helpers"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { mapStore, buildFogGeoJSON } from "~/lib/mapStore"
+import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import {
   MAP_STYLE_URL,
   FOG_COLOR,
@@ -58,7 +58,7 @@ export function MapView({
 
       map.addSource("fog-source", {
         type: "geojson",
-        data: buildFogGeoJSON([]),
+        data: worldFogGeoJSON(),
       })
       map.addLayer({
         id: "fog-layer",
@@ -123,15 +123,12 @@ export function MapView({
       }
 
       if (msg.type === "FOG_UPDATE") {
-        console.debug("[MapView] FOG_UPDATE", {
-          holes: msg.holes.length,
-          processedCount: msg.processedCount,
-        })
-        mapStore.fogHoles = msg.holes
+        console.debug("[MapView] FOG_UPDATE", { processedCount: msg.processedCount })
+        mapStore.fogData = msg.fogData
         const fogSource = map.getSource(
           "fog-source"
         ) as maplibregl.GeoJSONSource
-        fogSource?.setData(buildFogGeoJSON(msg.holes))
+        fogSource?.setData(msg.fogData)
 
         const trackFeatures = mapStore.tracks.map((t) =>
           lineString(t.coordinates, { name: t.name })

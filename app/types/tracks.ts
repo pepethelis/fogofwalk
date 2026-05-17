@@ -7,11 +7,17 @@ export interface ParsedTrack {
   format: "gpx" | "fit"
 }
 
+export type FogMode = "corridor" | "fill"
+
 export type WorkerInboundMessage =
-  | { type: "PROCESS_TRACKS"; tracks: ParsedTrack[] }
+  | { type: "PROCESS_TRACKS"; tracks: ParsedTrack[]; mode: FogMode }
   | { type: "RESET" }
 
 export type WorkerOutboundMessage =
-  | { type: "FOG_UPDATE"; holes: GeoJSON.Position[][]; processedCount: number }
+  | {
+      type: "FOG_UPDATE"
+      fogData: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>
+      processedCount: number
+    }
   | { type: "ERROR"; file: string; message: string }
   | { type: "DONE"; processedCount: number }
