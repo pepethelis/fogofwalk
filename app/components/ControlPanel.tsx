@@ -4,6 +4,7 @@ import { Button } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
 import { Switch } from "~/components/ui/switch"
 import type { FogMode } from "~/types/tracks"
+import { Card, CardContent } from "./ui/card"
 
 interface ControlPanelProps {
   trackCount: number
@@ -38,75 +39,89 @@ export function ControlPanel({
   }
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-background/90 backdrop-blur-md border border-border rounded-2xl px-5 py-4 flex items-center gap-4 shadow-lg">
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept=".gpx,.fit"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-
-      <Button
-        variant="default"
-        size="sm"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isProcessing}
-      >
-        <Plus weight="bold" className="mr-1.5" />
-        Add files
-      </Button>
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onClearAll}
-        disabled={isProcessing || trackCount === 0}
-      >
-        <Trash weight="bold" className="mr-1.5" />
-        Clear all
-      </Button>
-
-      <div className="h-5 w-px bg-border" />
-
-      <div className="flex items-center gap-2">
-        <MapTrifold weight="duotone" className="text-muted-foreground" size={16} />
-        <Switch
-          id="show-tracks"
-          checked={showTracks}
-          onCheckedChange={onShowTracksChange}
+    <Card className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 bg-background/80 backdrop-blur-md">
+      <CardContent className="flex items-center gap-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".gpx,.fit"
+          className="hidden"
+          onChange={handleFileChange}
         />
-        <label htmlFor="show-tracks" className="text-sm text-muted-foreground cursor-pointer select-none">
-          Tracks
-        </label>
-      </div>
 
-      <div className="h-5 w-px bg-border" />
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isProcessing}
+        >
+          <Plus weight="bold" className="mr-1.5" />
+          Add files
+        </Button>
 
-      <div className="flex items-center gap-2">
-        <Path weight="duotone" className="text-muted-foreground" size={16} />
-        <Switch
-          id="fog-mode"
-          checked={fogMode === "fill"}
-          onCheckedChange={(checked) => onFogModeChange(checked ? "fill" : "corridor")}
-        />
-        <label htmlFor="fog-mode" className="text-sm text-muted-foreground cursor-pointer select-none">
-          Fill loops
-        </label>
-      </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onClearAll}
+          disabled={isProcessing || trackCount === 0}
+        >
+          <Trash weight="bold" className="mr-1.5" />
+          Clear all
+        </Button>
 
-      <div className="h-5 w-px bg-border" />
+        <div className="h-5 w-px bg-border" />
 
-      {isProcessing ? (
-        <Badge variant="secondary" className="tabular-nums">
-          {processedCount} / {trackCount}
-        </Badge>
-      ) : trackCount > 0 ? (
-        <Badge variant="secondary" className="tabular-nums">
-          {trackCount} track{trackCount !== 1 ? "s" : ""}
-        </Badge>
-      ) : null}
-    </div>
+        <div className="flex items-center gap-2">
+          <MapTrifold
+            weight="duotone"
+            className="text-muted-foreground"
+            size={16}
+          />
+          <Switch
+            id="show-tracks"
+            checked={showTracks}
+            onCheckedChange={onShowTracksChange}
+          />
+          <label
+            htmlFor="show-tracks"
+            className="cursor-pointer text-sm text-muted-foreground select-none"
+          >
+            Tracks
+          </label>
+        </div>
+
+        <div className="h-5 w-px bg-border" />
+
+        <div className="flex items-center gap-2">
+          <Path weight="duotone" className="text-muted-foreground" size={16} />
+          <Switch
+            id="fog-mode"
+            checked={fogMode === "fill"}
+            onCheckedChange={(checked) =>
+              onFogModeChange(checked ? "fill" : "corridor")
+            }
+          />
+          <label
+            htmlFor="fog-mode"
+            className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
+          >
+            Fill loops
+          </label>
+        </div>
+
+        <div className="h-5 w-px bg-border" />
+
+        {isProcessing ? (
+          <Badge variant="secondary" className="tabular-nums">
+            {processedCount} / {trackCount}
+          </Badge>
+        ) : trackCount > 0 ? (
+          <Badge variant="secondary" className="tabular-nums">
+            {trackCount} track{trackCount !== 1 ? "s" : ""}
+          </Badge>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }
