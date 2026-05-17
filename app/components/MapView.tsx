@@ -10,6 +10,11 @@ import {
   FOG_COLOR,
   FOG_OPACITY,
   TRACK_COLOR,
+  TRACK_WIDTH_DEFAULT,
+  TRACK_WIDTH_SELECTED,
+  TRACK_OPACITY_DEFAULT,
+  TRACK_OPACITY_SELECTED,
+  TRACK_OPACITY_DIM,
 } from "~/constants/fog"
 import type { WorkerOutboundMessage } from "~/types/tracks"
 
@@ -20,17 +25,23 @@ interface MapViewProps {
   onMapReady?: () => void
   onProcessingUpdate?: (count: number, done: boolean) => void
   showTracks: boolean
+  selectedTrackId: string | null
+  onTrackSelect: (id: string | null) => void
 }
 
 export function MapView({
   onMapReady,
   onProcessingUpdate,
   showTracks,
+  selectedTrackId,
+  onTrackSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // Keep a ref to the latest callback to avoid stale closures in the worker handler
+  // Keep refs to latest callbacks to avoid stale closures in event handlers
   const onProcessingUpdateRef = useRef(onProcessingUpdate)
   onProcessingUpdateRef.current = onProcessingUpdate
+  const onTrackSelectRef = useRef(onTrackSelect)
+  onTrackSelectRef.current = onTrackSelect
 
   useEffect(() => {
     if (!containerRef.current || mapStore.map) return
@@ -92,6 +103,23 @@ export function MapView({
       })
       console.debug("[MapView] tracks layer added")
 
+      map.on("click", (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: ["tracks-layer"],
+        })
+        if (features.length > 0) {
+          onTrackSelectRef.current?.(features[0].properties?.id ?? null)
+        } else {
+          onTrackSelectRef.current?.(null)
+        }
+      })
+      map.on("mouseenter", "tracks-layer", () => {
+        map.getCanvas().style.cursor = "pointer"
+      })
+      map.on("mouseleave", "tracks-layer", () => {
+        map.getCanvas().style.cursor = ""
+      })
+
       mapStore.sourcesReady = true
       onMapReady?.()
     })
@@ -131,7 +159,7 @@ export function MapView({
         fogSource?.setData(msg.fogData)
 
         const trackFeatures = mapStore.tracks.map((t) =>
-          lineString(t.coordinates, { name: t.name })
+          lineString(t.coordinates, { name: t.name, id: t.id })
         )
 
         console.log({ trackFeatures })
@@ -179,6 +207,28 @@ export function MapView({
       showTracks ? "visible" : "none"
     )
   }, [showTracks])
+
+  useEffect(() => {
+    if (!mapStore.sourcesReady || !mapStore.map) return
+    const map = mapStore.map
+    if (!selectedTrackId) {
+      map.setPaintProperty("tracks-layer", "line-width", TRACK_WIDTH_DEFAULT)
+      map.setPaintProperty("tracks-layer", "line-opacity", TRACK_OPACITY_DEFAULT)
+      return
+    }
+    map.setPaintProperty("tracks-layer", "line-width", [
+      "case",
+      ["==", ["get", "id"], selectedTrackId],
+      TRACK_WIDTH_SELECTED,
+      TRACK_WIDTH_DEFAULT,
+    ])
+    map.setPaintProperty("tracks-layer", "line-opacity", [
+      "case",
+      ["==", ["get", "id"], selectedTrackId],
+      TRACK_OPACITY_SELECTED,
+      TRACK_OPACITY_DIM,
+    ])
+  }, [selectedTrackId])
 
   return <div ref={containerRef} className="absolute inset-0 h-screen" />
 }

@@ -6,6 +6,8 @@ import type { Route } from "./+types/home"
 import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
+import { TrackStatsPanel } from "~/components/TrackStatsPanel"
+import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
 import type { FogMode, ParsedTrack } from "~/types/tracks"
@@ -101,6 +103,7 @@ export default function Home() {
   const [fogMode, setFogMode] = useState<FogMode>("corridor")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
 
   // Show upload dialog once the map is ready and no tracks are loaded yet
   useEffect(() => {
@@ -123,6 +126,7 @@ export default function Home() {
       setTrackCount(0)
       setProcessedCount(0)
       setIsProcessing(false)
+      setSelectedTrackId(null)
     }
   }, [fetcher.data])
 
@@ -162,13 +166,21 @@ export default function Home() {
     }
   }
 
+  const selectedTrack = selectedTrackId
+    ? mapStore.tracks.find((t) => t.id === selectedTrackId) ?? null
+    : null
+
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      <MapView
-        showTracks={showTracks}
-        onMapReady={() => setMapReady(true)}
-        onProcessingUpdate={handleProcessingUpdate}
-      />
+      <ErrorBoundary>
+        <MapView
+          showTracks={showTracks}
+          onMapReady={() => setMapReady(true)}
+          onProcessingUpdate={handleProcessingUpdate}
+          selectedTrackId={selectedTrackId}
+          onTrackSelect={setSelectedTrackId}
+        />
+      </ErrorBoundary>
       {mapReady && (
         <>
           <ControlPanel
@@ -187,6 +199,20 @@ export default function Home() {
             onOpenChange={setShowUploadDialog}
             onAddFiles={(files) => handleAddFiles(files, fogMode)}
           />
+          {selectedTrack && (
+            <ErrorBoundary
+              fallback={(error, reset) => (
+                <div className="absolute bottom-4 right-4 z-10 w-80">
+                  <ErrorCard error={error} reset={reset} className="" />
+                </div>
+              )}
+            >
+              <TrackStatsPanel
+                track={selectedTrack}
+                onClose={() => setSelectedTrackId(null)}
+              />
+            </ErrorBoundary>
+          )}
         </>
       )}
     </div>
