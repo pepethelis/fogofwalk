@@ -39,9 +39,9 @@ export function computeTrackStats(points: RawPoint[]): TrackStats {
       durationMs: null,
       movingTimeMs: null,
       avgPaceMinPerKm: null,
-      avgMoovingPaceMinPerKm: null,
+      avgMovingPaceMinPerKm: null,
       avgSpeedKmh: null,
-      avgMoovingSpeedKmh: null,
+      avgMovingSpeedKmh: null,
       elevationProfile: [],
     }
   }
@@ -122,7 +122,7 @@ export function computeTrackStats(points: RawPoint[]): TrackStats {
       ? durationMs / 60_000 / distanceKm
       : null
 
-  const avgMoovingPaceMinPerKm =
+  const avgMovingPaceMinPerKm =
     effectiveTimeMs != null && effectiveTimeMs > 0 && distanceKm > 0
       ? effectiveTimeMs / 60_000 / distanceKm
       : null
@@ -132,7 +132,7 @@ export function computeTrackStats(points: RawPoint[]): TrackStats {
       ? distanceKm / (durationMs / 3_600_000)
       : null
 
-  const avgMoovingSpeedKmh =
+  const avgMovingSpeedKmh =
     effectiveTimeMs != null && effectiveTimeMs > 0 && distanceKm > 0
       ? distanceKm / (effectiveTimeMs / 3_600_000)
       : null
@@ -145,9 +145,9 @@ export function computeTrackStats(points: RawPoint[]): TrackStats {
     durationMs,
     movingTimeMs: effectiveTimeMs,
     avgPaceMinPerKm,
-    avgMoovingPaceMinPerKm,
+    avgMovingPaceMinPerKm,
     avgSpeedKmh,
-    avgMoovingSpeedKmh,
+    avgMovingSpeedKmh,
     elevationProfile,
   }
 }

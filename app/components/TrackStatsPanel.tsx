@@ -113,10 +113,10 @@ export function TrackStatsPanel({ track, onClose }: TrackStatsPanelProps) {
                 value={formatPace(stats.avgPaceMinPerKm)}
               />
             )}
-            {stats.avgMoovingPaceMinPerKm != null && (
+            {stats.avgMovingPaceMinPerKm != null && (
               <StatRow
-                label="Avg mooving pace"
-                value={formatPace(stats.avgMoovingPaceMinPerKm)}
+                label="Avg moving pace"
+                value={formatPace(stats.avgMovingPaceMinPerKm)}
               />
             )}
             {stats.avgSpeedKmh != null && (
@@ -125,10 +125,10 @@ export function TrackStatsPanel({ track, onClose }: TrackStatsPanelProps) {
                 value={formatSpeed(stats.avgSpeedKmh)}
               />
             )}
-            {stats.avgMoovingSpeedKmh != null && (
+            {stats.avgMovingSpeedKmh != null && (
               <StatRow
-                label="Avg mooving speed"
-                value={formatSpeed(stats.avgMoovingSpeedKmh)}
+                label="Avg moving speed"
+                value={formatSpeed(stats.avgMovingSpeedKmh)}
               />
             )}
             {stats.hasElevation && (

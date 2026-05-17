@@ -13,9 +13,9 @@ export interface TrackStats {
   durationMs: number | null
   movingTimeMs: number | null
   avgPaceMinPerKm: number | null
-  avgMoovingPaceMinPerKm: number | null
+  avgMovingPaceMinPerKm: number | null
   avgSpeedKmh: number | null
-  avgMoovingSpeedKmh: number | null
+  avgMovingSpeedKmh: number | null
   elevationProfile: ElevationPoint[]
 }
 
