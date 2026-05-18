@@ -1,9 +1,9 @@
 import { useRef } from "react"
-import { Plus, Trash, MapTrifold, Path } from "@phosphor-icons/react"
+import { Plus, Trash, MapTrifold, Path, Mountains } from "@phosphor-icons/react"
 import { Button } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
 import { Switch } from "~/components/ui/switch"
-import type { FogMode } from "~/types/tracks"
+import type { FogMode, MapMode } from "~/types/tracks"
 import { Card, CardContent } from "./ui/card"
 
 interface ControlPanelProps {
@@ -14,6 +14,8 @@ interface ControlPanelProps {
   onShowTracksChange: (value: boolean) => void
   fogMode: FogMode
   onFogModeChange: (mode: FogMode) => void
+  mapMode: MapMode
+  onMapModeChange: (mode: MapMode) => void
   onAddFiles: (files: FileList) => void
   onClearAll: () => void
 }
@@ -26,6 +28,8 @@ export function ControlPanel({
   onShowTracksChange,
   fogMode,
   onFogModeChange,
+  mapMode,
+  onMapModeChange,
   onAddFiles,
   onClearAll,
 }: ControlPanelProps) {
@@ -107,6 +111,23 @@ export function ControlPanel({
             className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
           >
             Fill loops
+          </label>
+        </div>
+
+        <div className="h-5 w-px bg-border" />
+
+        <div className="flex items-center gap-2">
+          <Mountains weight="duotone" className="text-muted-foreground" size={16} />
+          <Switch
+            id="map-mode"
+            checked={mapMode === "relief"}
+            onCheckedChange={(checked) => onMapModeChange(checked ? "relief" : "flat")}
+          />
+          <label
+            htmlFor="map-mode"
+            className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
+          >
+            Satellite
           </label>
         </div>
 

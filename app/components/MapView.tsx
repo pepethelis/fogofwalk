@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import maplibregl from "maplibre-gl"
+import type { StyleSpecification } from "maplibre-gl"
 import { Protocol } from "pmtiles"
 import bbox from "@turf/bbox"
 import { featureCollection, lineString } from "@turf/helpers"
@@ -16,10 +17,82 @@ import {
   TRACK_OPACITY_SELECTED,
   TRACK_OPACITY_DIM,
 } from "~/constants/fog"
-import type { WorkerOutboundMessage } from "~/types/tracks"
+import type { MapMode, WorkerOutboundMessage } from "~/types/tracks"
 
 const pmtilesProtocol = new Protocol()
 maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile.bind(pmtilesProtocol))
+
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    "esri-satellite": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution:
+        "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+    },
+  },
+  layers: [{ id: "esri-satellite-layer", type: "raster", source: "esri-satellite" }],
+}
+
+function setupMapLayers(map: maplibregl.Map, mode: MapMode): void {
+  if (mode === "relief") {
+    map.addSource("terrain-source", {
+      type: "raster-dem",
+      tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+      encoding: "terrarium",
+      tileSize: 256,
+      maxzoom: 14,
+    })
+    map.setTerrain({ source: "terrain-source", exaggeration: 2.5 })
+  }
+
+  if (mode === "flat") {
+    map.addSource("fog-source", {
+      type: "geojson",
+      data: mapStore.fogData ?? worldFogGeoJSON(),
+    })
+    map.addLayer({
+      id: "fog-layer",
+      type: "fill",
+      source: "fog-source",
+      paint: {
+        "fill-color": FOG_COLOR,
+        "fill-opacity": FOG_OPACITY,
+      },
+    })
+  }
+
+  const trackFeatures = mapStore.tracks.map((t) =>
+    lineString(t.coordinates, { name: t.name, id: t.id })
+  )
+  map.addSource("tracks-source", {
+    type: "geojson",
+    data: featureCollection(trackFeatures),
+  })
+  map.addLayer({
+    id: "tracks-layer",
+    type: "line",
+    source: "tracks-source",
+    layout: { "line-join": "round", "line-cap": "round", visibility: "visible" },
+    paint: {
+      "line-color": TRACK_COLOR,
+      "line-width": 2,
+      "line-opacity": 0.85,
+    },
+  })
+
+  map.on("mouseenter", "tracks-layer", () => {
+    map.getCanvas().style.cursor = "pointer"
+  })
+  map.on("mouseleave", "tracks-layer", () => {
+    map.getCanvas().style.cursor = ""
+  })
+}
 
 interface MapViewProps {
   onMapReady?: () => void
@@ -27,6 +100,7 @@ interface MapViewProps {
   showTracks: boolean
   selectedTrackId: string | null
   onTrackSelect: (id: string | null) => void
+  mapMode: MapMode
 }
 
 export function MapView({
@@ -35,91 +109,46 @@ export function MapView({
   showTracks,
   selectedTrackId,
   onTrackSelect,
+  mapMode,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // Keep refs to latest callbacks to avoid stale closures in event handlers
   const onProcessingUpdateRef = useRef(onProcessingUpdate)
   onProcessingUpdateRef.current = onProcessingUpdate
   const onTrackSelectRef = useRef(onTrackSelect)
   onTrackSelectRef.current = onTrackSelect
+  const showTracksRef = useRef(showTracks)
+  showTracksRef.current = showTracks
+  const selectedTrackIdRef = useRef(selectedTrackId)
+  selectedTrackIdRef.current = selectedTrackId
+  const pendingStyleLoadRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!containerRef.current || mapStore.map) return
-
-    const rect = containerRef.current.getBoundingClientRect()
-    console.debug("[MapView] container dimensions at mount", {
-      width: rect.width,
-      height: rect.height,
-    })
 
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: MAP_STYLE_URL,
       center: [15, 50],
       zoom: 4,
+      pitch: 0,
       attributionControl: { compact: true },
     })
     mapStore.map = map
 
+    map.on("click", (e) => {
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ["tracks-layer"],
+      })
+      if (features.length > 0) {
+        onTrackSelectRef.current?.(features[0].properties?.id ?? null)
+      } else {
+        onTrackSelectRef.current?.(null)
+      }
+    })
+
     map.once("load", () => {
-      console.debug("[MapView] map load event fired")
-
-      // Ensure the map fills its container after layout is complete
       map.resize()
-
-      map.addSource("fog-source", {
-        type: "geojson",
-        data: worldFogGeoJSON(),
-      })
-      map.addLayer({
-        id: "fog-layer",
-        type: "fill",
-        source: "fog-source",
-        paint: {
-          "fill-color": FOG_COLOR,
-          "fill-opacity": FOG_OPACITY,
-        },
-      })
-      console.debug("[MapView] fog layer added")
-
-      map.addSource("tracks-source", {
-        type: "geojson",
-        data: featureCollection([]),
-      })
-      map.addLayer({
-        id: "tracks-layer",
-        type: "line",
-        source: "tracks-source",
-        layout: {
-          "line-join": "round",
-          "line-cap": "round",
-          visibility: "visible",
-        },
-        paint: {
-          "line-color": TRACK_COLOR,
-          "line-width": 2,
-          "line-opacity": 0.85,
-        },
-      })
-      console.debug("[MapView] tracks layer added")
-
-      map.on("click", (e) => {
-        const features = map.queryRenderedFeatures(e.point, {
-          layers: ["tracks-layer"],
-        })
-        if (features.length > 0) {
-          onTrackSelectRef.current?.(features[0].properties?.id ?? null)
-        } else {
-          onTrackSelectRef.current?.(null)
-        }
-      })
-      map.on("mouseenter", "tracks-layer", () => {
-        map.getCanvas().style.cursor = "pointer"
-      })
-      map.on("mouseleave", "tracks-layer", () => {
-        map.getCanvas().style.cursor = ""
-      })
-
+      setupMapLayers(map, "flat")
       mapStore.sourcesReady = true
       onMapReady?.()
     })
@@ -132,48 +161,29 @@ export function MapView({
   }, [])
 
   useEffect(() => {
-    if (!mapStore.worker) {
-      console.debug("[MapView] worker not ready when setting up onmessage")
-      return
-    }
-    console.debug("[MapView] setting up worker onmessage handler")
+    if (!mapStore.worker) return
 
     mapStore.worker.onmessage = (e: MessageEvent<WorkerOutboundMessage>) => {
       const msg = e.data
       const map = mapStore.map
 
-      if (!map || !mapStore.sourcesReady) {
-        console.debug(
-          "[MapView] message dropped — sources not ready, type=",
-          msg.type
-        )
-        return
-      }
+      if (!map || !mapStore.sourcesReady) return
 
       if (msg.type === "FOG_UPDATE") {
-        console.debug("[MapView] FOG_UPDATE", { processedCount: msg.processedCount })
         mapStore.fogData = msg.fogData
-        const fogSource = map.getSource(
-          "fog-source"
-        ) as maplibregl.GeoJSONSource
+        const fogSource = map.getSource("fog-source") as maplibregl.GeoJSONSource
         fogSource?.setData(msg.fogData)
 
         const trackFeatures = mapStore.tracks.map((t) =>
           lineString(t.coordinates, { name: t.name, id: t.id })
         )
-
-        console.log({ trackFeatures })
-
-        const tracksSource = map.getSource(
-          "tracks-source"
-        ) as maplibregl.GeoJSONSource
+        const tracksSource = map.getSource("tracks-source") as maplibregl.GeoJSONSource
         tracksSource?.setData(featureCollection(trackFeatures))
 
         onProcessingUpdateRef.current?.(msg.processedCount, false)
       }
 
       if (msg.type === "DONE") {
-        console.debug("[MapView] DONE", { processedCount: msg.processedCount })
         onProcessingUpdateRef.current?.(msg.processedCount, true)
 
         if (mapStore.tracks.length > 0) {
@@ -182,9 +192,6 @@ export function MapView({
           )
           const [minLng, minLat, maxLng, maxLat] = bbox(fc)
           if (isFinite(minLng) && isFinite(minLat)) {
-            console.debug("[MapView] fitting bounds to all tracks", {
-              trackCount: mapStore.tracks.length,
-            })
             map.fitBounds(
               [
                 [minLng, minLat],
@@ -199,8 +206,55 @@ export function MapView({
   }, [])
 
   useEffect(() => {
+    const map = mapStore.map
+    if (!map || !mapStore.sourcesReady) return
+
+    if (pendingStyleLoadRef.current) {
+      map.off("styledata", pendingStyleLoadRef.current)
+      pendingStyleLoadRef.current = null
+    }
+
+    mapStore.sourcesReady = false
+    map.setStyle(mapMode === "flat" ? MAP_STYLE_URL : SATELLITE_STYLE)
+
+    const onStyleData = () => {
+      map.off("styledata", onStyleData)
+      pendingStyleLoadRef.current = null
+
+      setupMapLayers(map, mapMode)
+
+      map.setLayoutProperty(
+        "tracks-layer",
+        "visibility",
+        showTracksRef.current ? "visible" : "none"
+      )
+
+      const sid = selectedTrackIdRef.current
+      if (sid) {
+        map.setPaintProperty("tracks-layer", "line-width", [
+          "case",
+          ["==", ["get", "id"], sid],
+          TRACK_WIDTH_SELECTED,
+          TRACK_WIDTH_DEFAULT,
+        ])
+        map.setPaintProperty("tracks-layer", "line-opacity", [
+          "case",
+          ["==", ["get", "id"], sid],
+          TRACK_OPACITY_SELECTED,
+          TRACK_OPACITY_DIM,
+        ])
+      }
+
+      map.easeTo({ pitch: mapMode === "flat" ? 0 : 45, duration: 400 })
+      mapStore.sourcesReady = true
+    }
+
+    pendingStyleLoadRef.current = onStyleData
+    map.on("styledata", onStyleData)
+  }, [mapMode])
+
+  useEffect(() => {
     if (!mapStore.sourcesReady) return
-    console.debug("[MapView] toggling tracks visibility", showTracks)
     mapStore.map?.setLayoutProperty(
       "tracks-layer",
       "visibility",

@@ -10,7 +10,7 @@ import { TrackStatsPanel } from "~/components/TrackStatsPanel"
 import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
-import type { FogMode, ParsedTrack } from "~/types/tracks"
+import type { FogMode, MapMode, ParsedTrack } from "~/types/tracks"
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -127,6 +127,7 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [showTracks, setShowTracks] = useState(true)
   const [fogMode, setFogMode] = useState<FogMode>("corridor")
+  const [mapMode, setMapMode] = useState<MapMode>("flat")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
@@ -205,6 +206,7 @@ export default function Home() {
           onProcessingUpdate={handleProcessingUpdate}
           selectedTrackId={selectedTrackId}
           onTrackSelect={setSelectedTrackId}
+          mapMode={mapMode}
         />
       </ErrorBoundary>
       {mapReady && (
@@ -217,6 +219,8 @@ export default function Home() {
             onShowTracksChange={setShowTracks}
             fogMode={fogMode}
             onFogModeChange={handleFogModeChange}
+            mapMode={mapMode}
+            onMapModeChange={setMapMode}
             onAddFiles={handleAddFiles}
             onClearAll={handleClearAll}
           />

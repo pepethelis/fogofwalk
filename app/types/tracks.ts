@@ -28,6 +28,7 @@ export interface ParsedTrack {
 }
 
 export type FogMode = "corridor" | "fill"
+export type MapMode = "flat" | "relief"
 
 export type WorkerInboundMessage =
   | { type: "PROCESS_TRACKS"; tracks: ParsedTrack[]; mode: FogMode }
