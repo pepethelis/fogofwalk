@@ -1,0 +1,17 @@
+{
+  "name": "Fog of Walk",
+  "short_name": "Fog of Walk",
+  "description": "Import your GPS routes and watch the fog of war lift over every path you've explored.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a1e",
+  "theme_color": "#0a0a1e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -12,6 +12,32 @@ import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
 import type { FogMode, ParsedTrack } from "~/types/tracks"
 
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "Fog of Walk — Explore the unknown" },
+    {
+      name: "description",
+      content:
+        "Import your GPX and FIT activity files. Watch the fog of war lift over every trail you've run, every road you've cycled, every path you've ever walked.",
+    },
+    { property: "og:type", content: "website" },
+    { property: "og:title", content: "Fog of Walk" },
+    {
+      property: "og:description",
+      content:
+        "Import your GPX and FIT activity files. Watch the fog of war lift over every trail you've run, every road you've cycled, every path you've ever walked.",
+    },
+    { property: "og:site_name", content: "Fog of Walk" },
+    { name: "twitter:card", content: "summary" },
+    { name: "twitter:title", content: "Fog of Walk" },
+    {
+      name: "twitter:description",
+      content:
+        "Import your GPX and FIT activity files. Watch the fog of war lift over every trail you've run, every road you've cycled, every path you've ever walked.",
+    },
+  ]
+}
+
 export async function clientLoader(): Promise<{ initialized: boolean }> {
   if (!mapStore.worker) {
     console.debug("[clientLoader] creating worker")
