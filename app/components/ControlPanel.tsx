@@ -43,106 +43,104 @@ export function ControlPanel({
   }
 
   return (
-    <Card className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 bg-background/80 backdrop-blur-md">
-      <CardContent className="flex items-center gap-4">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".gpx,.fit"
-          className="hidden"
-          onChange={handleFileChange}
-        />
+    <>
+      <Card className="absolute top-6 left-6 z-10 bg-background/80 backdrop-blur-md">
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <MapTrifold
+              weight="duotone"
+              className="text-muted-foreground"
+              size={16}
+            />
+            <Switch
+              id="show-tracks"
+              checked={showTracks}
+              onCheckedChange={onShowTracksChange}
+            />
+            <label
+              htmlFor="show-tracks"
+              className="cursor-pointer text-sm text-muted-foreground select-none"
+            >
+              Tracks
+            </label>
+          </div>
 
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isProcessing}
-        >
-          <Plus weight="bold" className="mr-1.5" />
-          Add files
-        </Button>
+          <div className="flex items-center gap-2">
+            <Path weight="duotone" className="text-muted-foreground" size={16} />
+            <Switch
+              id="fog-mode"
+              checked={fogMode === "fill"}
+              onCheckedChange={(checked) =>
+                onFogModeChange(checked ? "fill" : "corridor")
+              }
+            />
+            <label
+              htmlFor="fog-mode"
+              className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
+            >
+              Fill loops
+            </label>
+          </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onClearAll}
-          disabled={isProcessing || trackCount === 0}
-        >
-          <Trash weight="bold" className="mr-1.5" />
-          Clear all
-        </Button>
+          <div className="flex items-center gap-2">
+            <Mountains weight="duotone" className="text-muted-foreground" size={16} />
+            <Switch
+              id="map-mode"
+              checked={mapMode === "relief"}
+              onCheckedChange={(checked) => onMapModeChange(checked ? "relief" : "flat")}
+            />
+            <label
+              htmlFor="map-mode"
+              className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
+            >
+              Satellite
+            </label>
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="h-5 w-px bg-border" />
-
-        <div className="flex items-center gap-2">
-          <MapTrifold
-            weight="duotone"
-            className="text-muted-foreground"
-            size={16}
+      <Card className="absolute bottom-6 left-6 z-10 bg-background/80 backdrop-blur-md">
+        <CardContent className="flex items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".gpx,.fit"
+            className="hidden"
+            onChange={handleFileChange}
           />
-          <Switch
-            id="show-tracks"
-            checked={showTracks}
-            onCheckedChange={onShowTracksChange}
-          />
-          <label
-            htmlFor="show-tracks"
-            className="cursor-pointer text-sm text-muted-foreground select-none"
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
           >
-            Tracks
-          </label>
-        </div>
+            <Plus weight="bold" className="mr-1.5" />
+            Add files
+          </Button>
 
-        <div className="h-5 w-px bg-border" />
-
-        <div className="flex items-center gap-2">
-          <Path weight="duotone" className="text-muted-foreground" size={16} />
-          <Switch
-            id="fog-mode"
-            checked={fogMode === "fill"}
-            onCheckedChange={(checked) =>
-              onFogModeChange(checked ? "fill" : "corridor")
-            }
-          />
-          <label
-            htmlFor="fog-mode"
-            className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearAll}
+            disabled={isProcessing || trackCount === 0}
           >
-            Fill loops
-          </label>
-        </div>
+            <Trash weight="bold" className="mr-1.5" />
+            Clear all
+          </Button>
 
-        <div className="h-5 w-px bg-border" />
-
-        <div className="flex items-center gap-2">
-          <Mountains weight="duotone" className="text-muted-foreground" size={16} />
-          <Switch
-            id="map-mode"
-            checked={mapMode === "relief"}
-            onCheckedChange={(checked) => onMapModeChange(checked ? "relief" : "flat")}
-          />
-          <label
-            htmlFor="map-mode"
-            className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
-          >
-            Satellite
-          </label>
-        </div>
-
-        <div className="h-5 w-px bg-border" />
-
-        {isProcessing ? (
-          <Badge variant="secondary" className="tabular-nums">
-            {processedCount} / {trackCount}
-          </Badge>
-        ) : trackCount > 0 ? (
-          <Badge variant="secondary" className="tabular-nums">
-            {trackCount} track{trackCount !== 1 ? "s" : ""}
-          </Badge>
-        ) : null}
-      </CardContent>
-    </Card>
+          {isProcessing ? (
+            <Badge variant="secondary" className="tabular-nums">
+              {processedCount} / {trackCount}
+            </Badge>
+          ) : trackCount > 0 ? (
+            <Badge variant="secondary" className="tabular-nums">
+              {trackCount} track{trackCount !== 1 ? "s" : ""}
+            </Badge>
+          ) : null}
+        </CardContent>
+      </Card>
+    </>
   )
 }
