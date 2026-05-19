@@ -36,14 +36,18 @@ const SATELLITE_STYLE: StyleSpecification = {
         "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
     },
   },
-  layers: [{ id: "esri-satellite-layer", type: "raster", source: "esri-satellite" }],
+  layers: [
+    { id: "esri-satellite-layer", type: "raster", source: "esri-satellite" },
+  ],
 }
 
 function setupMapLayers(map: maplibregl.Map, mode: MapMode): void {
   if (mode === "relief") {
     map.addSource("terrain-source", {
       type: "raster-dem",
-      tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+      tiles: [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+      ],
       encoding: "terrarium",
       tileSize: 256,
       maxzoom: 14,
@@ -78,7 +82,11 @@ function setupMapLayers(map: maplibregl.Map, mode: MapMode): void {
     id: "tracks-layer",
     type: "line",
     source: "tracks-source",
-    layout: { "line-join": "round", "line-cap": "round", visibility: "visible" },
+    layout: {
+      "line-join": "round",
+      "line-cap": "round",
+      visibility: "visible",
+    },
     paint: {
       "line-color": TRACK_COLOR,
       "line-width": 2,
@@ -129,7 +137,8 @@ export function MapView({
       container: containerRef.current,
       style: MAP_STYLE_URL,
       center: [15, 50],
-      zoom: 4,
+      zoom: 5,
+      minZoom: 5,
       pitch: 0,
       attributionControl: { compact: true },
     })
@@ -171,13 +180,17 @@ export function MapView({
 
       if (msg.type === "FOG_UPDATE") {
         mapStore.fogData = msg.fogData
-        const fogSource = map.getSource("fog-source") as maplibregl.GeoJSONSource
+        const fogSource = map.getSource(
+          "fog-source"
+        ) as maplibregl.GeoJSONSource
         fogSource?.setData(msg.fogData)
 
         const trackFeatures = mapStore.tracks.map((t) =>
           lineString(t.coordinates, { name: t.name, id: t.id })
         )
-        const tracksSource = map.getSource("tracks-source") as maplibregl.GeoJSONSource
+        const tracksSource = map.getSource(
+          "tracks-source"
+        ) as maplibregl.GeoJSONSource
         tracksSource?.setData(featureCollection(trackFeatures))
 
         onProcessingUpdateRef.current?.(msg.processedCount, false)
@@ -267,7 +280,11 @@ export function MapView({
     const map = mapStore.map
     if (!selectedTrackId) {
       map.setPaintProperty("tracks-layer", "line-width", TRACK_WIDTH_DEFAULT)
-      map.setPaintProperty("tracks-layer", "line-opacity", TRACK_OPACITY_DEFAULT)
+      map.setPaintProperty(
+        "tracks-layer",
+        "line-opacity",
+        TRACK_OPACITY_DEFAULT
+      )
       return
     }
     map.setPaintProperty("tracks-layer", "line-width", [
