@@ -1,5 +1,13 @@
 import { useRef } from "react"
-import { Plus, Trash, MapTrifold, Path, Mountains } from "@phosphor-icons/react"
+import {
+  Plus,
+  Trash,
+  MapTrifold,
+  Path,
+  Mountains,
+  Globe,
+  Cloud,
+} from "@phosphor-icons/react"
 import { Button } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
 import { Switch } from "~/components/ui/switch"
@@ -12,6 +20,8 @@ interface ControlPanelProps {
   isProcessing: boolean
   showTracks: boolean
   onShowTracksChange: (value: boolean) => void
+  showFog: boolean
+  onShowFogChange: (value: boolean) => void
   fogMode: FogMode
   onFogModeChange: (mode: FogMode) => void
   mapMode: MapMode
@@ -26,6 +36,8 @@ export function ControlPanel({
   isProcessing,
   showTracks,
   onShowTracksChange,
+  showFog,
+  onShowFogChange,
   fogMode,
   onFogModeChange,
   mapMode,
@@ -66,7 +78,11 @@ export function ControlPanel({
           </div>
 
           <div className="flex items-center gap-2">
-            <Path weight="duotone" className="text-muted-foreground" size={16} />
+            <Path
+              weight="duotone"
+              className="text-muted-foreground"
+              size={16}
+            />
             <Switch
               id="fog-mode"
               checked={fogMode === "fill"}
@@ -83,18 +99,48 @@ export function ControlPanel({
           </div>
 
           <div className="flex items-center gap-2">
-            <Mountains weight="duotone" className="text-muted-foreground" size={16} />
+            <Cloud
+              weight="duotone"
+              className="text-muted-foreground"
+              size={16}
+            />
             <Switch
-              id="map-mode"
-              checked={mapMode === "relief"}
-              onCheckedChange={(checked) => onMapModeChange(checked ? "relief" : "flat")}
+              id="show-fog"
+              checked={showFog}
+              onCheckedChange={onShowFogChange}
             />
             <label
-              htmlFor="map-mode"
-              className="cursor-pointer text-sm text-nowrap text-muted-foreground select-none"
+              htmlFor="show-fog"
+              className="cursor-pointer text-sm text-muted-foreground select-none"
             >
-              Satellite
+              Fog
             </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              <Button
+                size="icon"
+                variant={mapMode === "flat" ? "default" : "ghost"}
+                className="h-6 w-6"
+                onClick={() => onMapModeChange("flat")}
+                title="Standard"
+              >
+                <Globe size={13} />
+              </Button>
+              <Button
+                size="icon"
+                variant={mapMode === "relief" ? "default" : "ghost"}
+                className="h-6 w-6"
+                onClick={() => onMapModeChange("relief")}
+                title="Satellite"
+              >
+                <Mountains size={13} />
+              </Button>
+            </div>
+            <span className="text-xs text-muted-foreground select-none">
+              Map style
+            </span>
           </div>
         </CardContent>
       </Card>

@@ -126,6 +126,7 @@ export default function Home() {
   const [processedCount, setProcessedCount] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showTracks, setShowTracks] = useState(true)
+  const [showFog, setShowFog] = useState(true)
   const [fogMode, setFogMode] = useState<FogMode>("corridor")
   const [mapMode, setMapMode] = useState<MapMode>("flat")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
@@ -202,6 +203,7 @@ export default function Home() {
       <ErrorBoundary>
         <MapView
           showTracks={showTracks}
+          showFog={showFog}
           onMapReady={() => setMapReady(true)}
           onProcessingUpdate={handleProcessingUpdate}
           selectedTrackId={selectedTrackId}
@@ -217,6 +219,8 @@ export default function Home() {
             isProcessing={isProcessing}
             showTracks={showTracks}
             onShowTracksChange={setShowTracks}
+            showFog={showFog}
+            onShowFogChange={setShowFog}
             fogMode={fogMode}
             onFogModeChange={handleFogModeChange}
             mapMode={mapMode}

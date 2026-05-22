@@ -55,7 +55,8 @@ function setupMapLayers(map: maplibregl.Map, mode: MapMode): void {
     map.setTerrain({ source: "terrain-source", exaggeration: 2.5 })
   }
 
-  if (mode === "flat") {
+
+  if (mode !== "relief") {
     map.addSource("fog-source", {
       type: "geojson",
       data: mapStore.fogData ?? worldFogGeoJSON(),
@@ -106,6 +107,7 @@ interface MapViewProps {
   onMapReady?: () => void
   onProcessingUpdate?: (count: number, done: boolean) => void
   showTracks: boolean
+  showFog: boolean
   selectedTrackId: string | null
   onTrackSelect: (id: string | null) => void
   mapMode: MapMode
@@ -115,6 +117,7 @@ export function MapView({
   onMapReady,
   onProcessingUpdate,
   showTracks,
+  showFog,
   selectedTrackId,
   onTrackSelect,
   mapMode,
@@ -126,6 +129,8 @@ export function MapView({
   onTrackSelectRef.current = onTrackSelect
   const showTracksRef = useRef(showTracks)
   showTracksRef.current = showTracks
+  const showFogRef = useRef(showFog)
+  showFogRef.current = showFog
   const selectedTrackIdRef = useRef(selectedTrackId)
   selectedTrackIdRef.current = selectedTrackId
   const pendingStyleLoadRef = useRef<(() => void) | null>(null)
@@ -228,7 +233,7 @@ export function MapView({
     }
 
     mapStore.sourcesReady = false
-    map.setStyle(mapMode === "flat" ? MAP_STYLE_URL : SATELLITE_STYLE)
+    map.setStyle(mapMode === "relief" ? SATELLITE_STYLE : MAP_STYLE_URL)
 
     const onStyleData = () => {
       map.off("styledata", onStyleData)
@@ -241,6 +246,14 @@ export function MapView({
         "visibility",
         showTracksRef.current ? "visible" : "none"
       )
+
+      if (mapMode !== "relief") {
+        map.setLayoutProperty(
+          "fog-layer",
+          "visibility",
+          showFogRef.current ? "visible" : "none"
+        )
+      }
 
       const sid = selectedTrackIdRef.current
       if (sid) {
@@ -258,7 +271,7 @@ export function MapView({
         ])
       }
 
-      map.easeTo({ pitch: mapMode === "flat" ? 0 : 45, duration: 400 })
+      map.easeTo({ pitch: mapMode === "relief" ? 45 : 0, duration: 400 })
       mapStore.sourcesReady = true
     }
 
@@ -274,6 +287,15 @@ export function MapView({
       showTracks ? "visible" : "none"
     )
   }, [showTracks])
+
+  useEffect(() => {
+    if (!mapStore.sourcesReady) return
+    mapStore.map?.setLayoutProperty(
+      "fog-layer",
+      "visibility",
+      showFog ? "visible" : "none"
+    )
+  }, [showFog])
 
   useEffect(() => {
     if (!mapStore.sourcesReady || !mapStore.map) return
