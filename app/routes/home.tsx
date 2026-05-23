@@ -7,13 +7,13 @@ import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
-import { PhotoModal } from "~/components/PhotoModal"
+import { PhotoCard } from "~/components/PhotoCard"
 import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
 import { processPhotoFiles } from "~/lib/photos"
 import type { FogMode, MapMode, ParsedTrack } from "~/types/tracks"
-import type { PhotoEntry } from "~/types/photos"
+import type { PhotoEntry, PhotoGroup } from "~/types/photos"
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -136,7 +136,7 @@ export default function Home() {
   const [mapReady, setMapReady] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
   const [photos, setPhotos] = useState<PhotoEntry[]>([])
-  const [selectedPhoto, setSelectedPhoto] = useState<PhotoEntry | null>(null)
+  const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
 
   // Show upload dialog once the map is ready and no tracks are loaded yet
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function Home() {
       setIsProcessing(false)
       setSelectedTrackId(null)
       setPhotos([])
-      setSelectedPhoto(null)
+      setSelectedGroup(null)
     }
   }, [fetcher.data])
 
@@ -223,7 +223,7 @@ export default function Home() {
           onTrackSelect={setSelectedTrackId}
           mapMode={mapMode}
           photos={photos}
-          onPhotoSelect={setSelectedPhoto}
+          onPhotoSelect={setSelectedGroup}
         />
       </ErrorBoundary>
       {mapReady && (
@@ -250,9 +250,9 @@ export default function Home() {
             onOpenChange={setShowUploadDialog}
             onAddFiles={(files) => handleAddFiles(files, fogMode)}
           />
-          <PhotoModal
-            photo={selectedPhoto}
-            onClose={() => setSelectedPhoto(null)}
+          <PhotoCard
+            group={selectedGroup}
+            onClose={() => setSelectedGroup(null)}
           />
           {selectedTrack && (
             <ErrorBoundary

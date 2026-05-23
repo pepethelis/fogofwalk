@@ -6,3 +6,10 @@ export interface PhotoEntry {
   lat: number
   objectUrl?: string
 }
+
+export interface PhotoGroup {
+  id: string
+  photos: PhotoEntry[]
+  lng: number
+  lat: number
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import maplibregl from "maplibre-gl"
 import type { StyleSpecification } from "maplibre-gl"
 import { Protocol } from "pmtiles"
@@ -18,7 +18,39 @@ import {
   TRACK_OPACITY_DIM,
 } from "~/constants/fog"
 import type { MapMode, WorkerOutboundMessage } from "~/types/tracks"
-import type { PhotoEntry } from "~/types/photos"
+import type { PhotoEntry, PhotoGroup } from "~/types/photos"
+
+const CLUSTER_PIXEL_RADIUS = 50
+
+function computeClusters(photos: PhotoEntry[], map: maplibregl.Map): PhotoGroup[] {
+  if (photos.length === 0) return []
+  const projected = photos.map((p) => ({ photo: p, px: map.project([p.lng, p.lat]) }))
+  const assigned = new Set<string>()
+  const clusters: PhotoGroup[] = []
+
+  for (const item of projected) {
+    if (assigned.has(item.photo.id)) continue
+    const members: PhotoEntry[] = [item.photo]
+    assigned.add(item.photo.id)
+
+    for (const other of projected) {
+      if (assigned.has(other.photo.id)) continue
+      const dx = item.px.x - other.px.x
+      const dy = item.px.y - other.px.y
+      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_PIXEL_RADIUS) {
+        members.push(other.photo)
+        assigned.add(other.photo.id)
+      }
+    }
+
+    members.sort((a, b) => a.takenAtMs - b.takenAtMs)
+    const lng = members.reduce((s, p) => s + p.lng, 0) / members.length
+    const lat = members.reduce((s, p) => s + p.lat, 0) / members.length
+    clusters.push({ id: members.map((p) => p.id).sort().join("|"), photos: members, lng, lat })
+  }
+
+  return clusters
+}
 
 const pmtilesProtocol = new Protocol()
 maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile.bind(pmtilesProtocol))
@@ -113,7 +145,7 @@ interface MapViewProps {
   onTrackSelect: (id: string | null) => void
   mapMode: MapMode
   photos: PhotoEntry[]
-  onPhotoSelect: (photo: PhotoEntry | null) => void
+  onPhotoSelect: (group: PhotoGroup | null) => void
 }
 
 export function MapView({
@@ -142,6 +174,55 @@ export function MapView({
   selectedTrackIdRef.current = selectedTrackId
   const pendingStyleLoadRef = useRef<(() => void) | null>(null)
   const photoMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
+  const photosRef = useRef<PhotoEntry[]>(photos)
+  photosRef.current = photos
+
+  const rebuildPhotoMarkers = useCallback(() => {
+    const map = mapStore.map
+    if (!map) return
+
+    photoMarkersRef.current.forEach((m) => m.remove())
+    photoMarkersRef.current.clear()
+
+    const clusters = computeClusters(photosRef.current, map)
+    for (const cluster of clusters) {
+      for (const p of cluster.photos) {
+        if (!p.objectUrl) p.objectUrl = URL.createObjectURL(p.file)
+      }
+
+      const el = document.createElement("div")
+      el.style.cssText =
+        "position:relative;width:36px;height:36px;border-radius:50%;border:2px solid white;" +
+        "overflow:visible;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.4);"
+      const imgWrap = document.createElement("div")
+      imgWrap.style.cssText = "width:100%;height:100%;border-radius:50%;overflow:hidden;"
+      const img = document.createElement("img")
+      img.src = cluster.photos[0].objectUrl!
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;"
+      imgWrap.appendChild(img)
+      el.appendChild(imgWrap)
+
+      if (cluster.photos.length > 1) {
+        const badge = document.createElement("div")
+        badge.textContent = String(cluster.photos.length)
+        badge.style.cssText =
+          "position:absolute;top:-2px;right:-2px;background:#ff6b35;color:white;" +
+          "border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:bold;" +
+          "display:flex;align-items:center;justify-content:center;line-height:1;"
+        el.appendChild(badge)
+      }
+
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        onPhotoSelectRef.current(cluster)
+      })
+
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        .setLngLat([cluster.lng, cluster.lat])
+        .addTo(map)
+      photoMarkersRef.current.set(cluster.id, marker)
+    }
+  }, [])
 
   useEffect(() => {
     if (!containerRef.current || mapStore.map) return
@@ -174,6 +255,8 @@ export function MapView({
       mapStore.sourcesReady = true
       onMapReady?.()
     })
+
+    map.on("zoomend", () => rebuildPhotoMarkers())
 
     return () => {
       mapStore.sourcesReady = false
@@ -283,7 +366,7 @@ export function MapView({
 
       map.easeTo({ pitch: mapMode === "relief" ? 45 : 0, duration: 400 })
       mapStore.sourcesReady = true
-      photoMarkersRef.current.forEach((marker) => marker.addTo(map))
+      rebuildPhotoMarkers()
     }
 
     pendingStyleLoadRef.current = onStyleData
@@ -335,46 +418,8 @@ export function MapView({
   }, [selectedTrackId])
 
   useEffect(() => {
-    const map = mapStore.map
-    if (!map) return
-
-    const markers = photoMarkersRef.current
-    const newIds = new Set(photos.map((p) => p.id))
-
-    for (const [id, marker] of markers) {
-      if (!newIds.has(id)) {
-        marker.remove()
-        markers.delete(id)
-      }
-    }
-
-    for (const photo of photos) {
-      if (markers.has(photo.id)) continue
-
-      if (!photo.objectUrl) {
-        photo.objectUrl = URL.createObjectURL(photo.file)
-      }
-
-      const el = document.createElement("div")
-      el.style.cssText =
-        "width:36px;height:36px;border-radius:50%;border:2px solid white;" +
-        "overflow:hidden;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.4);background:#ccc;"
-      const img = document.createElement("img")
-      img.src = photo.objectUrl
-      img.style.cssText = "width:100%;height:100%;object-fit:cover;"
-      el.appendChild(img)
-      el.addEventListener("click", (e) => {
-        e.stopPropagation()
-        onPhotoSelectRef.current(photo)
-      })
-
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-        .setLngLat([photo.lng, photo.lat])
-        .addTo(map)
-
-      markers.set(photo.id, marker)
-    }
-  }, [photos])
+    rebuildPhotoMarkers()
+  }, [photos, rebuildPhotoMarkers])
 
   return <div ref={containerRef} className="absolute inset-0 h-screen" />
 }

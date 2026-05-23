@@ -3,7 +3,6 @@ import type { ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry } from "~/types/photos"
 
 const MATCH_TOLERANCE_MS = 5 * 60 * 1000
-const DEDUP_DISTANCE_M = 20
 
 function haversineM(lng1: number, lat1: number, lng2: number, lat2: number): number {
   const R = 6371000
@@ -11,7 +10,9 @@ function haversineM(lng1: number, lat1: number, lng2: number, lat2: number): num
   const dLng = ((lng2 - lng1) * Math.PI) / 180
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
@@ -57,7 +58,7 @@ export async function processPhotoFiles(
   tracks: ParsedTrack[],
   existingPhotos: PhotoEntry[],
 ): Promise<PhotoEntry[]> {
-  const accepted: PhotoEntry[] = []
+  const newEntries: PhotoEntry[] = []
 
   for (const file of files) {
     const takenAtMs = await readExifTimestamp(file)
@@ -66,20 +67,20 @@ export async function processPhotoFiles(
     const match = matchPhotoToTrack(takenAtMs, tracks)
     if (!match) continue
 
-    const allSoFar = [...existingPhotos, ...accepted]
-    const isDup = allSoFar.some(
-      (p) => haversineM(p.lng, p.lat, match.lng, match.lat) < DEDUP_DISTANCE_M,
+    // Skip if this exact file was already added (same name + timestamp)
+    const alreadyExists = existingPhotos.some(
+      (p) => p.file.name === file.name && p.takenAtMs === takenAtMs,
     )
-    if (isDup) continue
+    if (alreadyExists) continue
 
-    accepted.push({
-      id: crypto.randomUUID(),
-      file,
-      takenAtMs,
-      lng: match.lng,
-      lat: match.lat,
-    })
+    // Skip if a photo was taken at the exact same moment (genuine duplicate)
+    const isDuplicate = existingPhotos.some(
+      (p) => p.takenAtMs === takenAtMs && haversineM(p.lng, p.lat, match.lng, match.lat) < 1,
+    )
+    if (isDuplicate) continue
+
+    newEntries.push({ id: crypto.randomUUID(), file, takenAtMs, lng: match.lng, lat: match.lat })
   }
 
-  return accepted
+  return newEntries
 }
