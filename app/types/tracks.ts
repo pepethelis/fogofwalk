@@ -23,6 +23,7 @@ export interface ParsedTrack {
   id: string
   name: string
   coordinates: TrackCoords
+  pointTimestamps?: number[]
   format: "gpx" | "fit"
   stats: TrackStats
 }

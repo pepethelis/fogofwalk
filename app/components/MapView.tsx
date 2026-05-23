@@ -18,6 +18,7 @@ import {
   TRACK_OPACITY_DIM,
 } from "~/constants/fog"
 import type { MapMode, WorkerOutboundMessage } from "~/types/tracks"
+import type { PhotoEntry } from "~/types/photos"
 
 const pmtilesProtocol = new Protocol()
 maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile.bind(pmtilesProtocol))
@@ -111,6 +112,8 @@ interface MapViewProps {
   selectedTrackId: string | null
   onTrackSelect: (id: string | null) => void
   mapMode: MapMode
+  photos: PhotoEntry[]
+  onPhotoSelect: (photo: PhotoEntry | null) => void
 }
 
 export function MapView({
@@ -121,12 +124,16 @@ export function MapView({
   selectedTrackId,
   onTrackSelect,
   mapMode,
+  photos,
+  onPhotoSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const onProcessingUpdateRef = useRef(onProcessingUpdate)
   onProcessingUpdateRef.current = onProcessingUpdate
   const onTrackSelectRef = useRef(onTrackSelect)
   onTrackSelectRef.current = onTrackSelect
+  const onPhotoSelectRef = useRef(onPhotoSelect)
+  onPhotoSelectRef.current = onPhotoSelect
   const showTracksRef = useRef(showTracks)
   showTracksRef.current = showTracks
   const showFogRef = useRef(showFog)
@@ -134,6 +141,7 @@ export function MapView({
   const selectedTrackIdRef = useRef(selectedTrackId)
   selectedTrackIdRef.current = selectedTrackId
   const pendingStyleLoadRef = useRef<(() => void) | null>(null)
+  const photoMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
 
   useEffect(() => {
     if (!containerRef.current || mapStore.map) return
@@ -170,6 +178,8 @@ export function MapView({
     return () => {
       mapStore.sourcesReady = false
       mapStore.map = null
+      photoMarkersRef.current.forEach((m) => m.remove())
+      photoMarkersRef.current.clear()
       map.remove()
     }
   }, [])
@@ -273,6 +283,7 @@ export function MapView({
 
       map.easeTo({ pitch: mapMode === "relief" ? 45 : 0, duration: 400 })
       mapStore.sourcesReady = true
+      photoMarkersRef.current.forEach((marker) => marker.addTo(map))
     }
 
     pendingStyleLoadRef.current = onStyleData
@@ -322,6 +333,48 @@ export function MapView({
       TRACK_OPACITY_DIM,
     ])
   }, [selectedTrackId])
+
+  useEffect(() => {
+    const map = mapStore.map
+    if (!map) return
+
+    const markers = photoMarkersRef.current
+    const newIds = new Set(photos.map((p) => p.id))
+
+    for (const [id, marker] of markers) {
+      if (!newIds.has(id)) {
+        marker.remove()
+        markers.delete(id)
+      }
+    }
+
+    for (const photo of photos) {
+      if (markers.has(photo.id)) continue
+
+      if (!photo.objectUrl) {
+        photo.objectUrl = URL.createObjectURL(photo.file)
+      }
+
+      const el = document.createElement("div")
+      el.style.cssText =
+        "width:36px;height:36px;border-radius:50%;border:2px solid white;" +
+        "overflow:hidden;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.4);background:#ccc;"
+      const img = document.createElement("img")
+      img.src = photo.objectUrl
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;"
+      el.appendChild(img)
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        onPhotoSelectRef.current(photo)
+      })
+
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        .setLngLat([photo.lng, photo.lat])
+        .addTo(map)
+
+      markers.set(photo.id, marker)
+    }
+  }, [photos])
 
   return <div ref={containerRef} className="absolute inset-0 h-screen" />
 }
