@@ -9,6 +9,7 @@ import {
 } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
 import { ElevationChart } from "~/components/ElevationChart"
+import { useDraggable } from "~/lib/useDraggable"
 
 interface TrackStatsPanelProps {
   track: ParsedTrack
@@ -72,11 +73,18 @@ const EMPTY_STATS = {
 export function TrackStatsPanel({ track, onClose }: TrackStatsPanelProps) {
   // stats may be absent on tracks loaded before this field was added (HMR / future compat)
   const stats = track.stats ?? EMPTY_STATS
+  const { style, onMouseDown } = useDraggable({
+    x: typeof window !== "undefined" ? window.innerWidth - 336 : 0,
+    y: 16,
+  })
 
   return (
-    <div className="absolute top-4 right-4 z-10 w-80">
+    <div className="absolute z-10 w-80" style={style}>
       <Card className="bg-background/80 backdrop-blur-md">
-        <CardHeader>
+        <CardHeader
+          onMouseDown={onMouseDown}
+          className="cursor-grab active:cursor-grabbing select-none"
+        >
           <CardTitle className="truncate">{track.name}</CardTitle>
           <CardAction>
             <Button

@@ -7,10 +7,13 @@ import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
+import { PhotoCard } from "~/components/PhotoCard"
 import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
+import { processPhotoFiles } from "~/lib/photos"
 import type { FogMode, MapMode, ParsedTrack } from "~/types/tracks"
+import type { PhotoEntry, PhotoGroup } from "~/types/photos"
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -132,6 +135,8 @@ export default function Home() {
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<PhotoEntry[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
 
   // Show upload dialog once the map is ready and no tracks are loaded yet
   useEffect(() => {
@@ -155,6 +160,8 @@ export default function Home() {
       setProcessedCount(0)
       setIsProcessing(false)
       setSelectedTrackId(null)
+      setPhotos([])
+      setSelectedGroup(null)
     }
   }, [fetcher.data])
 
@@ -167,9 +174,15 @@ export default function Home() {
   }
 
   function handleClearAll() {
+    photos.forEach((p) => { if (p.objectUrl) URL.revokeObjectURL(p.objectUrl) })
     const formData = new FormData()
     formData.append("intent", "clear-all")
     fetcher.submit(formData, { method: "post" })
+  }
+
+  async function handleAddPhotos(files: FileList) {
+    const newEntries = await processPhotoFiles(Array.from(files), mapStore.tracks, photos)
+    if (newEntries.length > 0) setPhotos((prev) => [...prev, ...newEntries])
   }
 
   function handleFogModeChange(newMode: FogMode) {
@@ -209,6 +222,8 @@ export default function Home() {
           selectedTrackId={selectedTrackId}
           onTrackSelect={setSelectedTrackId}
           mapMode={mapMode}
+          photos={photos}
+          onPhotoSelect={setSelectedGroup}
         />
       </ErrorBoundary>
       {mapReady && (
@@ -227,11 +242,17 @@ export default function Home() {
             onMapModeChange={setMapMode}
             onAddFiles={handleAddFiles}
             onClearAll={handleClearAll}
+            photoCount={photos.length}
+            onAddPhotos={handleAddPhotos}
           />
           <FileUploadDialog
             open={showUploadDialog}
             onOpenChange={setShowUploadDialog}
             onAddFiles={(files) => handleAddFiles(files, fogMode)}
+          />
+          <PhotoCard
+            group={selectedGroup}
+            onClose={() => setSelectedGroup(null)}
           />
           {selectedTrack && (
             <ErrorBoundary

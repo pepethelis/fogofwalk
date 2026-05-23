@@ -7,6 +7,7 @@ import {
   Mountains,
   Globe,
   Cloud,
+  Image,
 } from "@phosphor-icons/react"
 import { Button } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
@@ -28,6 +29,8 @@ interface ControlPanelProps {
   onMapModeChange: (mode: MapMode) => void
   onAddFiles: (files: FileList) => void
   onClearAll: () => void
+  photoCount: number
+  onAddPhotos: (files: FileList) => void
 }
 
 export function ControlPanel({
@@ -44,13 +47,23 @@ export function ControlPanel({
   onMapModeChange,
   onAddFiles,
   onClearAll,
+  photoCount,
+  onAddPhotos,
 }: ControlPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
     if (!files || files.length === 0) return
     onAddFiles(files)
+    e.target.value = ""
+  }
+
+  function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    onAddPhotos(files)
     e.target.value = ""
   }
 
@@ -155,6 +168,14 @@ export function ControlPanel({
             className="hidden"
             onChange={handleFileChange}
           />
+          <input
+            ref={photoInputRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.heic,image/jpeg,image/heic"
+            className="hidden"
+            onChange={handlePhotoFileChange}
+          />
 
           <Button
             variant="default"
@@ -164,6 +185,16 @@ export function ControlPanel({
           >
             <Plus weight="bold" className="mr-1.5" />
             Add files
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => photoInputRef.current?.click()}
+            title="Add photos (JPEG/HEIC)"
+          >
+            <Image weight="bold" className="mr-1.5" />
+            Add photos
           </Button>
 
           <Button
@@ -185,6 +216,11 @@ export function ControlPanel({
               {trackCount} track{trackCount !== 1 ? "s" : ""}
             </Badge>
           ) : null}
+          {photoCount > 0 && (
+            <Badge variant="secondary" className="tabular-nums">
+              {photoCount} photo{photoCount !== 1 ? "s" : ""}
+            </Badge>
+          )}
         </CardContent>
       </Card>
     </>

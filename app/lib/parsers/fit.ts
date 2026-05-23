@@ -31,12 +31,14 @@ export async function parseFitFile(file: File): Promise<ParsedTrack[]> {
   })
 
   const coords: TrackCoords = rawPoints.map((p) => [p.lng, p.lat])
+  const ts = rawPoints.map((p) => p.timestampMs)
 
   return [
     {
       id: crypto.randomUUID(),
       name: file.name,
       coordinates: coords,
+      pointTimestamps: ts.every((t) => t == null) ? undefined : ts.map((t) => t ?? -1),
       format: "fit",
       stats: computeTrackStats(rawPoints),
     },

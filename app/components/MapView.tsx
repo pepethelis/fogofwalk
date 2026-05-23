@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import maplibregl from "maplibre-gl"
 import type { StyleSpecification } from "maplibre-gl"
 import { Protocol } from "pmtiles"
@@ -18,6 +18,39 @@ import {
   TRACK_OPACITY_DIM,
 } from "~/constants/fog"
 import type { MapMode, WorkerOutboundMessage } from "~/types/tracks"
+import type { PhotoEntry, PhotoGroup } from "~/types/photos"
+
+const CLUSTER_PIXEL_RADIUS = 50
+
+function computeClusters(photos: PhotoEntry[], map: maplibregl.Map): PhotoGroup[] {
+  if (photos.length === 0) return []
+  const projected = photos.map((p) => ({ photo: p, px: map.project([p.lng, p.lat]) }))
+  const assigned = new Set<string>()
+  const clusters: PhotoGroup[] = []
+
+  for (const item of projected) {
+    if (assigned.has(item.photo.id)) continue
+    const members: PhotoEntry[] = [item.photo]
+    assigned.add(item.photo.id)
+
+    for (const other of projected) {
+      if (assigned.has(other.photo.id)) continue
+      const dx = item.px.x - other.px.x
+      const dy = item.px.y - other.px.y
+      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_PIXEL_RADIUS) {
+        members.push(other.photo)
+        assigned.add(other.photo.id)
+      }
+    }
+
+    members.sort((a, b) => a.takenAtMs - b.takenAtMs)
+    const lng = members.reduce((s, p) => s + p.lng, 0) / members.length
+    const lat = members.reduce((s, p) => s + p.lat, 0) / members.length
+    clusters.push({ id: members.map((p) => p.id).sort().join("|"), photos: members, lng, lat })
+  }
+
+  return clusters
+}
 
 const pmtilesProtocol = new Protocol()
 maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile.bind(pmtilesProtocol))
@@ -111,6 +144,8 @@ interface MapViewProps {
   selectedTrackId: string | null
   onTrackSelect: (id: string | null) => void
   mapMode: MapMode
+  photos: PhotoEntry[]
+  onPhotoSelect: (group: PhotoGroup | null) => void
 }
 
 export function MapView({
@@ -121,12 +156,16 @@ export function MapView({
   selectedTrackId,
   onTrackSelect,
   mapMode,
+  photos,
+  onPhotoSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const onProcessingUpdateRef = useRef(onProcessingUpdate)
   onProcessingUpdateRef.current = onProcessingUpdate
   const onTrackSelectRef = useRef(onTrackSelect)
   onTrackSelectRef.current = onTrackSelect
+  const onPhotoSelectRef = useRef(onPhotoSelect)
+  onPhotoSelectRef.current = onPhotoSelect
   const showTracksRef = useRef(showTracks)
   showTracksRef.current = showTracks
   const showFogRef = useRef(showFog)
@@ -134,6 +173,75 @@ export function MapView({
   const selectedTrackIdRef = useRef(selectedTrackId)
   selectedTrackIdRef.current = selectedTrackId
   const pendingStyleLoadRef = useRef<(() => void) | null>(null)
+  const photoMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
+  const photosRef = useRef<PhotoEntry[]>(photos)
+  photosRef.current = photos
+
+  const clusterCacheRef = useRef<Map<number, PhotoGroup[]>>(new Map())
+
+  const rebuildPhotoMarkers = useCallback(() => {
+    const map = mapStore.map
+    if (!map) return
+
+    photoMarkersRef.current.forEach((m) => m.remove())
+    photoMarkersRef.current.clear()
+
+    if (photosRef.current.length === 0) return
+
+    const zoom = Math.round(map.getZoom())
+    let clusters = clusterCacheRef.current.get(zoom)
+    if (!clusters) {
+      clusters = computeClusters(photosRef.current, map)
+      clusterCacheRef.current.set(zoom, clusters)
+    }
+
+    const HALF = 18 // visual circle radius (36px / 2)
+
+    for (const cluster of clusters) {
+      for (const p of cluster.photos) {
+        if (!p.objectUrl) p.objectUrl = URL.createObjectURL(p.file)
+      }
+
+      // Zero-size anchor: el has 0×0 size so MapLibre places its top-left exactly
+      // at the coordinate regardless of anchor. The circle is then positioned so its
+      // center sits at that same point using negative left/top offsets.
+      const el = document.createElement("div")
+      el.style.cssText = "cursor:pointer;width:0;height:0;position:relative;"
+
+      const circle = document.createElement("div")
+      circle.style.cssText =
+        `position:absolute;left:${-HALF}px;top:${-HALF}px;` +
+        `width:${HALF * 2}px;height:${HALF * 2}px;` +
+        "border-radius:50%;border:2px solid white;box-sizing:border-box;" +
+        "overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.4);"
+      const img = document.createElement("img")
+      img.src = cluster.photos[0].objectUrl!
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;"
+      circle.appendChild(img)
+      el.appendChild(circle)
+
+      if (cluster.photos.length > 1) {
+        const badge = document.createElement("div")
+        badge.textContent = String(cluster.photos.length)
+        badge.style.cssText =
+          `position:absolute;left:${HALF - 6}px;top:${-HALF - 10}px;` +
+          "background:#ff6b35;color:white;border-radius:50%;" +
+          "width:16px;height:16px;font-size:9px;font-weight:bold;" +
+          "display:flex;align-items:center;justify-content:center;pointer-events:none;"
+        el.appendChild(badge)
+      }
+
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        onPhotoSelectRef.current(cluster)
+      })
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([cluster.lng, cluster.lat])
+        .addTo(map)
+      photoMarkersRef.current.set(cluster.id, marker)
+    }
+  }, [])
 
   useEffect(() => {
     if (!containerRef.current || mapStore.map) return
@@ -167,9 +275,13 @@ export function MapView({
       onMapReady?.()
     })
 
+    map.on("zoomend", () => rebuildPhotoMarkers())
+
     return () => {
       mapStore.sourcesReady = false
       mapStore.map = null
+      photoMarkersRef.current.forEach((m) => m.remove())
+      photoMarkersRef.current.clear()
       map.remove()
     }
   }, [])
@@ -273,6 +385,7 @@ export function MapView({
 
       map.easeTo({ pitch: mapMode === "relief" ? 45 : 0, duration: 400 })
       mapStore.sourcesReady = true
+      rebuildPhotoMarkers()
     }
 
     pendingStyleLoadRef.current = onStyleData
@@ -322,6 +435,11 @@ export function MapView({
       TRACK_OPACITY_DIM,
     ])
   }, [selectedTrackId])
+
+  useEffect(() => {
+    clusterCacheRef.current.clear()
+    rebuildPhotoMarkers()
+  }, [photos, rebuildPhotoMarkers])
 
   return <div ref={containerRef} className="absolute inset-0 h-screen" />
 }

@@ -1,9 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(bun run typecheck)",
-      "Bash(bun run build)",
-      "WebFetch(domain:tiles.openfreemap.org)"
-    ]
+    "allow": ["Bash(bun run typecheck)", "Bash(bun run build)"]
   }
 }
