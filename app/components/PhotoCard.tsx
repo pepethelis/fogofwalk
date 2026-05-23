@@ -19,8 +19,8 @@ interface PhotoCardProps {
 export function PhotoCard({ group, onClose }: PhotoCardProps) {
   const [idx, setIdx] = useState(0)
   const { style, onMouseDown } = useDraggable({
-    x: typeof window !== "undefined" ? window.innerWidth / 2 - 160 : 100,
-    y: 80,
+    x: typeof window !== "undefined" ? window.innerWidth - 336 : 0,
+    y: 16,
   })
 
   useEffect(() => {
@@ -67,6 +67,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => setIdx((i) => i - 1)}
+                disabled={idx === 0}
                 className={idx === 0 ? "invisible" : ""}
                 aria-label="Previous photo"
               >
@@ -79,6 +80,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => setIdx((i) => i + 1)}
+                disabled={idx === count - 1}
                 className={idx === count - 1 ? "invisible" : ""}
                 aria-label="Next photo"
               >
