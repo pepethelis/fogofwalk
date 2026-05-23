@@ -177,6 +177,8 @@ export function MapView({
   const photosRef = useRef<PhotoEntry[]>(photos)
   photosRef.current = photos
 
+  const clusterCacheRef = useRef<Map<number, PhotoGroup[]>>(new Map())
+
   const rebuildPhotoMarkers = useCallback(() => {
     const map = mapStore.map
     if (!map) return
@@ -184,31 +186,48 @@ export function MapView({
     photoMarkersRef.current.forEach((m) => m.remove())
     photoMarkersRef.current.clear()
 
-    const clusters = computeClusters(photosRef.current, map)
+    if (photosRef.current.length === 0) return
+
+    const zoom = Math.round(map.getZoom())
+    let clusters = clusterCacheRef.current.get(zoom)
+    if (!clusters) {
+      clusters = computeClusters(photosRef.current, map)
+      clusterCacheRef.current.set(zoom, clusters)
+    }
+
+    const HALF = 18 // visual circle radius (36px / 2)
+
     for (const cluster of clusters) {
       for (const p of cluster.photos) {
         if (!p.objectUrl) p.objectUrl = URL.createObjectURL(p.file)
       }
 
+      // Zero-size anchor: el has 0×0 size so MapLibre places its top-left exactly
+      // at the coordinate regardless of anchor. The circle is then positioned so its
+      // center sits at that same point using negative left/top offsets.
       const el = document.createElement("div")
-      el.style.cssText =
-        "position:relative;width:36px;height:36px;border-radius:50%;border:2px solid white;" +
-        "overflow:visible;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.4);"
-      const imgWrap = document.createElement("div")
-      imgWrap.style.cssText = "width:100%;height:100%;border-radius:50%;overflow:hidden;"
+      el.style.cssText = "cursor:pointer;width:0;height:0;position:relative;"
+
+      const circle = document.createElement("div")
+      circle.style.cssText =
+        `position:absolute;left:${-HALF}px;top:${-HALF}px;` +
+        `width:${HALF * 2}px;height:${HALF * 2}px;` +
+        "border-radius:50%;border:2px solid white;box-sizing:border-box;" +
+        "overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.4);"
       const img = document.createElement("img")
       img.src = cluster.photos[0].objectUrl!
-      img.style.cssText = "width:100%;height:100%;object-fit:cover;"
-      imgWrap.appendChild(img)
-      el.appendChild(imgWrap)
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;"
+      circle.appendChild(img)
+      el.appendChild(circle)
 
       if (cluster.photos.length > 1) {
         const badge = document.createElement("div")
         badge.textContent = String(cluster.photos.length)
         badge.style.cssText =
-          "position:absolute;top:-2px;right:-2px;background:#ff6b35;color:white;" +
-          "border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:bold;" +
-          "display:flex;align-items:center;justify-content:center;line-height:1;"
+          `position:absolute;left:${HALF - 6}px;top:${-HALF - 10}px;` +
+          "background:#ff6b35;color:white;border-radius:50%;" +
+          "width:16px;height:16px;font-size:9px;font-weight:bold;" +
+          "display:flex;align-items:center;justify-content:center;pointer-events:none;"
         el.appendChild(badge)
       }
 
@@ -217,7 +236,7 @@ export function MapView({
         onPhotoSelectRef.current(cluster)
       })
 
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat([cluster.lng, cluster.lat])
         .addTo(map)
       photoMarkersRef.current.set(cluster.id, marker)
@@ -418,6 +437,7 @@ export function MapView({
   }, [selectedTrackId])
 
   useEffect(() => {
+    clusterCacheRef.current.clear()
     rebuildPhotoMarkers()
   }, [photos, rebuildPhotoMarkers])
 
