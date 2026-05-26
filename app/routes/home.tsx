@@ -23,8 +23,8 @@ import {
   clearFogCache,
   clearAll,
   isFogCacheValid,
-  loadMapPosition,
 } from "~/lib/storage"
+import { clearMapPosition } from "~/lib/mapStore"
 import type { FogMode, MapMode, ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry, PhotoGroup } from "~/types/photos"
 
@@ -74,12 +74,11 @@ export async function clientLoader(): Promise<{
   }
 
   // Restore persisted data in parallel
-  const [tracks, photos, fogMode, fogCache, mapPosition] = await Promise.all([
+  const [tracks, photos, fogMode, fogCache] = await Promise.all([
     loadTracks(),
     loadPhotos(),
     loadFogMode(),
     loadFogCache(),
-    loadMapPosition(),
   ])
 
   const restoredFogMode: FogMode = fogMode ?? "corridor"
@@ -101,10 +100,8 @@ export async function clientLoader(): Promise<{
     }
   }
 
-  if (mapPosition) {
-    mapStore.initialCenter = mapPosition.center
-    mapStore.initialZoom = mapPosition.zoom
-  }
+  // initialCenter/initialZoom are already loaded from localStorage at mapStore module init time.
+  // No async needed — they're ready before any useEffect runs.
 
   console.debug("[clientLoader] restored", tracks.length, "tracks,", photos.length, "photos")
   return {
@@ -179,6 +176,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
       )
     }
     await clearAll()
+    clearMapPosition()
     return { intent: "clear-all" as const, trackCount: 0 }
   }
 

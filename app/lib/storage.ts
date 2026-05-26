@@ -296,35 +296,14 @@ export function isFogCacheValid(
   return currentTrackIds.every((id) => cacheSet.has(id))
 }
 
-// ─── Map position ─────────────────────────────────────────────────────────────
-
-interface StoredMapPosition {
-  center: [number, number]
-  zoom: number
-}
-
-/** Save the current map center and zoom level (debounce at call site). */
-export async function saveMapPosition(
-  center: [number, number],
-  zoom: number
-): Promise<void> {
-  return prefSet("mapPosition", { center, zoom } satisfies StoredMapPosition)
-}
-
-/** Load saved map position, or null if not yet stored. */
-export async function loadMapPosition(): Promise<StoredMapPosition | null> {
-  return prefGet<StoredMapPosition>("mapPosition")
-}
-
 // ─── Clear all ────────────────────────────────────────────────────────────────
 
-/** Wipe all persisted data (tracks, photos, prefs). Used by "clear-all". */
+/** Wipe all persisted data (tracks, photos, IDB prefs). Used by "clear-all". */
 export async function clearAll(): Promise<void> {
   await Promise.all([
     clearTracks(),
     clearPhotos(),
     prefDelete("fogMode"),
     prefDelete("fogCache"),
-    prefDelete("mapPosition"),
   ])
 }

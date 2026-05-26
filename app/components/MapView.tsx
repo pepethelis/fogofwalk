@@ -6,7 +6,8 @@ import bbox from "@turf/bbox"
 import { featureCollection, lineString } from "@turf/helpers"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
-import { saveFogCache, saveMapPosition } from "~/lib/storage"
+import { saveFogCache } from "~/lib/storage"
+import { saveMapPosition } from "~/lib/mapStore"
 import {
   MAP_STYLE_URL,
   FOG_COLOR,
@@ -258,14 +259,11 @@ export function MapView({
     })
     mapStore.map = map
 
-    // Persist map position 1 s after the user stops moving
-    let savePositionTimer: ReturnType<typeof setTimeout> | undefined
+    // Persist map position synchronously on every moveend.
+    // localStorage writes are synchronous so there's no async/timer race on page unload.
     map.on("moveend", () => {
-      clearTimeout(savePositionTimer)
-      savePositionTimer = setTimeout(() => {
-        const c = map.getCenter()
-        saveMapPosition([c.lng, c.lat], map.getZoom())
-      }, 1000)
+      const c = map.getCenter()
+      saveMapPosition([c.lng, c.lat], map.getZoom())
     })
 
     map.on("click", (e) => {
@@ -289,7 +287,6 @@ export function MapView({
     map.on("zoomend", () => rebuildPhotoMarkers())
 
     return () => {
-      clearTimeout(savePositionTimer)
       mapStore.sourcesReady = false
       mapStore.map = null
       photoMarkersRef.current.forEach((m) => m.remove())
