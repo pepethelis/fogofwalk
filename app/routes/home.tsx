@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useFetcher, useLoaderData } from "react-router"
 import type maplibregl from "maplibre-gl"
 import { featureCollection } from "@turf/helpers"
@@ -12,6 +12,19 @@ import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
 import { processPhotoFiles } from "~/lib/photos"
+import {
+  saveTracks,
+  loadTracks,
+  savePhotos,
+  loadPhotos,
+  saveFogMode,
+  loadFogMode,
+  loadFogCache,
+  clearFogCache,
+  clearAll,
+  isFogCacheValid,
+  loadMapPosition,
+} from "~/lib/storage"
 import type { FogMode, MapMode, ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry, PhotoGroup } from "~/types/photos"
 
@@ -41,7 +54,15 @@ export function meta({}: Route.MetaArgs) {
   ]
 }
 
-export async function clientLoader(): Promise<{ initialized: boolean }> {
+// Module-level cache for restored photos — avoids passing File objects through
+// React Router's serialized loader return type (which strips Blob/File methods).
+let _restoredPhotos: PhotoEntry[] = []
+
+export async function clientLoader(): Promise<{
+  initialized: boolean
+  restoredTrackCount: number
+  restoredFogMode: FogMode
+}> {
   if (!mapStore.worker) {
     console.debug("[clientLoader] creating worker")
     mapStore.worker = new Worker(
@@ -51,7 +72,46 @@ export async function clientLoader(): Promise<{ initialized: boolean }> {
     mapStore.worker.onerror = (e) => console.error("[worker] uncaught error", e)
     console.debug("[clientLoader] worker created", mapStore.worker)
   }
-  return { initialized: true }
+
+  // Restore persisted data in parallel
+  const [tracks, photos, fogMode, fogCache, mapPosition] = await Promise.all([
+    loadTracks(),
+    loadPhotos(),
+    loadFogMode(),
+    loadFogCache(),
+    loadMapPosition(),
+  ])
+
+  const restoredFogMode: FogMode = fogMode ?? "corridor"
+  mapStore.fogMode = restoredFogMode
+  _restoredPhotos = photos
+
+  if (tracks.length > 0) {
+    mapStore.tracks = tracks
+    const trackIds = tracks.map((t) => t.id).sort()
+    if (fogCache && isFogCacheValid(fogCache, trackIds, restoredFogMode)) {
+      // Cache hit: restore fog directly — setupMapLayers will use mapStore.fogData
+      mapStore.fogData = fogCache.fogData
+      console.debug("[clientLoader] restored fog cache for", tracks.length, "tracks")
+    } else {
+      // Cache miss: fog will be null, world fog shown until worker reprocesses
+      mapStore.fogData = null
+      mapStore.isRestoreReprocess = true
+      console.debug("[clientLoader] fog cache stale/absent — will reprocess", tracks.length, "tracks")
+    }
+  }
+
+  if (mapPosition) {
+    mapStore.initialCenter = mapPosition.center
+    mapStore.initialZoom = mapPosition.zoom
+  }
+
+  console.debug("[clientLoader] restored", tracks.length, "tracks,", photos.length, "photos")
+  return {
+    initialized: true,
+    restoredTrackCount: tracks.length,
+    restoredFogMode,
+  }
 }
 clientLoader.hydrate = true as const
 
@@ -93,6 +153,9 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     if (allTracks.length > 0) {
       mapStore.tracks.push(...allTracks)
       mapStore.worker?.postMessage({ type: "PROCESS_TRACKS", tracks: allTracks, mode })
+      // Persist new tracks and invalidate stale fog cache
+      await saveTracks(allTracks)
+      await clearFogCache()
     }
     return {
       intent: "add-files" as const,
@@ -115,6 +178,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
         featureCollection([])
       )
     }
+    await clearAll()
     return { intent: "clear-all" as const, trackCount: 0 }
   }
 
@@ -122,27 +186,50 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 }
 
 export default function Home() {
-  useLoaderData<typeof clientLoader>()
+  const loaderData = useLoaderData<typeof clientLoader>()
   const fetcher = useFetcher<typeof clientAction>()
 
-  const [trackCount, setTrackCount] = useState(0)
+  // Initialise from restored data (falls back to defaults on first load)
+  const [trackCount, setTrackCount] = useState(loaderData.restoredTrackCount)
   const [processedCount, setProcessedCount] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showTracks, setShowTracks] = useState(true)
   const [showFog, setShowFog] = useState(true)
-  const [fogMode, setFogMode] = useState<FogMode>("corridor")
+  const [fogMode, setFogMode] = useState<FogMode>(loaderData.restoredFogMode)
   const [mapMode, setMapMode] = useState<MapMode>("flat")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
-  const [photos, setPhotos] = useState<PhotoEntry[]>([])
+  const [photos, setPhotos] = useState<PhotoEntry[]>(_restoredPhotos)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
+  // Loading overlay: starts visible, fades out when map is ready, then unmounts
+  const [overlayDone, setOverlayDone] = useState(false)
+
+  // Reprocess flag: true when tracks were restored but fog cache was stale/absent.
+  // mapStore.fogData is null in that case; checked once after map is ready.
+  const needsReprocessRef = useRef(
+    loaderData.restoredTrackCount > 0 && mapStore.fogData === null
+  )
 
   // Show upload dialog once the map is ready and no tracks are loaded yet
   useEffect(() => {
     if (mapReady && trackCount === 0) {
       setShowUploadDialog(true)
     }
+  }, [mapReady])
+
+  // Trigger worker reprocessing when fog cache was stale
+  useEffect(() => {
+    if (!mapReady || !needsReprocessRef.current) return
+    needsReprocessRef.current = false
+    if (mapStore.tracks.length === 0) return
+    setIsProcessing(true)
+    setProcessedCount(0)
+    mapStore.worker?.postMessage({
+      type: "PROCESS_TRACKS",
+      tracks: mapStore.tracks,
+      mode: loaderData.restoredFogMode,
+    })
   }, [mapReady])
 
   // React to completed action (runs for both FileUploadDialog and ControlPanel submissions)
@@ -182,11 +269,17 @@ export default function Home() {
 
   async function handleAddPhotos(files: FileList) {
     const newEntries = await processPhotoFiles(Array.from(files), mapStore.tracks, photos)
-    if (newEntries.length > 0) setPhotos((prev) => [...prev, ...newEntries])
+    if (newEntries.length > 0) {
+      setPhotos((prev) => [...prev, ...newEntries])
+      savePhotos(newEntries) // fire-and-forget; quota-aware
+    }
   }
 
   function handleFogModeChange(newMode: FogMode) {
     setFogMode(newMode)
+    mapStore.fogMode = newMode
+    saveFogMode(newMode) // fire-and-forget
+    clearFogCache() // will be rebuilt after reprocessing
     if (mapStore.tracks.length === 0) return
     // Reset worker and re-process all stored tracks with the new mode
     mapStore.worker?.postMessage({ type: "RESET" })
@@ -213,6 +306,14 @@ export default function Home() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
+      {/* Dark overlay: hides the white→tiles→fog flash; fades out once map is ready */}
+      {!overlayDone && (
+        <div
+          className="pointer-events-none absolute inset-0 z-50 transition-opacity duration-500"
+          style={{ backgroundColor: "#0a0a1e", opacity: mapReady ? 0 : 1 }}
+          onTransitionEnd={() => setOverlayDone(true)}
+        />
+      )}
       <ErrorBoundary>
         <MapView
           showTracks={showTracks}

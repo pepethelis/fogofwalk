@@ -6,6 +6,7 @@ import bbox from "@turf/bbox"
 import { featureCollection, lineString } from "@turf/helpers"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
+import { saveFogCache, saveMapPosition } from "~/lib/storage"
 import {
   MAP_STYLE_URL,
   FOG_COLOR,
@@ -249,13 +250,23 @@ export function MapView({
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: MAP_STYLE_URL,
-      center: [15, 50],
-      zoom: 5,
+      center: mapStore.initialCenter ?? [15, 50],
+      zoom: mapStore.initialZoom ?? 5,
       minZoom: 5,
       pitch: 0,
       attributionControl: { compact: true },
     })
     mapStore.map = map
+
+    // Persist map position 1 s after the user stops moving
+    let savePositionTimer: ReturnType<typeof setTimeout> | undefined
+    map.on("moveend", () => {
+      clearTimeout(savePositionTimer)
+      savePositionTimer = setTimeout(() => {
+        const c = map.getCenter()
+        saveMapPosition([c.lng, c.lat], map.getZoom())
+      }, 1000)
+    })
 
     map.on("click", (e) => {
       const features = map.queryRenderedFeatures(e.point, {
@@ -278,6 +289,7 @@ export function MapView({
     map.on("zoomend", () => rebuildPhotoMarkers())
 
     return () => {
+      clearTimeout(savePositionTimer)
       mapStore.sourcesReady = false
       mapStore.map = null
       photoMarkersRef.current.forEach((m) => m.remove())
@@ -317,18 +329,32 @@ export function MapView({
         onProcessingUpdateRef.current?.(msg.processedCount, true)
 
         if (mapStore.tracks.length > 0) {
-          const fc = featureCollection(
-            mapStore.tracks.map((t) => lineString(t.coordinates))
-          )
-          const [minLng, minLat, maxLng, maxLat] = bbox(fc)
-          if (isFinite(minLng) && isFinite(minLat)) {
-            map.fitBounds(
-              [
-                [minLng, minLat],
-                [maxLng, maxLat],
-              ],
-              { padding: 60, maxZoom: 14 }
+          // Only auto-fit bounds for genuine new uploads, not restore reprocessing
+          // (restore reprocessing preserves the user's saved map position)
+          if (!mapStore.isRestoreReprocess) {
+            const fc = featureCollection(
+              mapStore.tracks.map((t) => lineString(t.coordinates))
             )
+            const [minLng, minLat, maxLng, maxLat] = bbox(fc)
+            if (isFinite(minLng) && isFinite(minLat)) {
+              map.fitBounds(
+                [
+                  [minLng, minLat],
+                  [maxLng, maxLat],
+                ],
+                { padding: 60, maxZoom: 14 }
+              )
+            }
+          }
+          mapStore.isRestoreReprocess = false
+
+          // Persist the computed fog so the next page load can skip reprocessing
+          if (mapStore.fogData) {
+            saveFogCache({
+              trackIds: mapStore.tracks.map((t) => t.id).sort(),
+              fogMode: mapStore.fogMode,
+              fogData: mapStore.fogData,
+            })
           }
         }
       }
