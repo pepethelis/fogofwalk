@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react"
 import { useFetcher, useLoaderData } from "react-router"
 import type maplibregl from "maplibre-gl"
-import { featureCollection } from "@turf/helpers"
+import { featureCollection, lineString } from "@turf/helpers"
+import bbox from "@turf/bbox"
 import type { Route } from "./+types/home"
 import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
+import { PhotoErrorDialog } from "~/components/PhotoErrorDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
 import { ShareDialog } from "~/components/ShareDialog"
 import { PhotoCard } from "~/components/PhotoCard"
@@ -202,6 +204,7 @@ export default function Home() {
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [photos, setPhotos] = useState<PhotoEntry[]>(_restoredPhotos)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
+  const [photoErrorOpen, setPhotoErrorOpen] = useState(false)
   // Loading overlay: starts visible, fades out when map is ready, then unmounts
   const [overlayDone, setOverlayDone] = useState(false)
 
@@ -210,6 +213,12 @@ export default function Home() {
   const needsReprocessRef = useRef(
     loaderData.restoredTrackCount > 0 && mapStore.fogData === null
   )
+  // Set to true when the user uploads new files; cleared after fitBounds fires.
+  // Lets the isProcessing useEffect distinguish new uploads from restore-reprocesses
+  // and fog-mode reprocesses (both of which should NOT zoom the map).
+  const isNewUploadRef = useRef(false)
+  // Track count before the latest upload so fitBounds can identify the new tracks.
+  const prevTrackCountRef = useRef(0)
 
   // Show upload dialog once the map is ready and no tracks are loaded yet
   useEffect(() => {
@@ -232,11 +241,50 @@ export default function Home() {
     })
   }, [mapReady])
 
+  // Zoom to tracks after a new upload finishes processing.
+  // Using useEffect (instead of calling fitBounds directly inside the worker's
+  // onmessage) guarantees we're in a normal render cycle where the map is
+  // fully ready and React state is settled.
+  // isNewUploadRef is only set for genuine add-files actions; restore-reprocesses
+  // and fog-mode reprocesses leave it false so the map position is preserved.
+  useEffect(() => {
+    if (isProcessing || !isNewUploadRef.current) return
+    isNewUploadRef.current = false
+    const map = mapStore.map
+    if (mapStore.tracks.length === 0 || !map) return
+
+    // Compute bbox for all tracks and check the zoom needed to fit them.
+    const allFc = featureCollection(mapStore.tracks.map((t) => lineString(t.coordinates)))
+    const [w, s, e, n] = bbox(allFc)
+    if (!isFinite(w)) return
+
+    const allBounds: [[number, number], [number, number]] = [[w, s], [e, n]]
+    const camera = map.cameraForBounds(allBounds, { padding: 60, maxZoom: 14 })
+    const wouldBeZoom = typeof camera?.zoom === "number" ? camera.zoom : Infinity
+
+    if (wouldBeZoom >= 5) {
+      // All tracks fit at an acceptable zoom level — show them all.
+      map.fitBounds(allBounds, { padding: 60, maxZoom: 14 })
+    } else {
+      // Tracks are too spread out (different countries/continents). Zoom to
+      // just the newly added ones so the user sees what they just uploaded.
+      const newTracks = mapStore.tracks.slice(prevTrackCountRef.current)
+      if (newTracks.length === 0) return
+      const newFc = featureCollection(newTracks.map((t) => lineString(t.coordinates)))
+      const [nw, ns, ne, nn] = bbox(newFc)
+      if (isFinite(nw)) {
+        map.fitBounds([[nw, ns], [ne, nn]], { padding: 60, maxZoom: 14 })
+      }
+    }
+  }, [isProcessing])
+
   // React to completed action (runs for both FileUploadDialog and ControlPanel submissions)
   useEffect(() => {
     const data = fetcher.data
     if (!data) return
     if (data.intent === "add-files") {
+      prevTrackCountRef.current = trackCount // snapshot pre-upload count for fitBounds fallback
+      isNewUploadRef.current = true // triggers fitBounds in the isProcessing effect below
       setTrackCount(data.trackCount)
       setIsProcessing(true)
       setProcessedCount(0)
@@ -277,7 +325,20 @@ export default function Home() {
     if (newEntries.length > 0) {
       setPhotos((prev) => [...prev, ...newEntries])
       savePhotos(newEntries) // fire-and-forget; quota-aware
+    } else {
+      setPhotoErrorOpen(true)
     }
+  }
+
+  async function handleLoadSampleData() {
+    const response = await fetch("/sample-run.gpx")
+    const blob = await response.blob()
+    const file = new File([blob], "sample-run.gpx", { type: "application/gpx+xml" })
+    const formData = new FormData()
+    formData.append("intent", "add-files")
+    formData.append("mode", fogMode)
+    formData.append("files", file)
+    fetcher.submit(formData, { method: "post", encType: "multipart/form-data" })
   }
 
   function handleFogModeChange(newMode: FogMode) {
@@ -302,6 +363,8 @@ export default function Home() {
     if (done) {
       setIsProcessing(false)
       setTrackCount(mapStore.tracks.length)
+      // fitBounds is handled by the useEffect([isProcessing]) above:
+      // it fires after React re-renders, when map state is fully settled.
     }
   }
 
@@ -355,7 +418,9 @@ export default function Home() {
             open={showUploadDialog}
             onOpenChange={setShowUploadDialog}
             onAddFiles={(files) => handleAddFiles(files, fogMode)}
+            onLoadSampleData={handleLoadSampleData}
           />
+          <PhotoErrorDialog open={photoErrorOpen} onOpenChange={setPhotoErrorOpen} />
           <PhotoCard
             group={selectedGroup}
             onClose={() => setSelectedGroup(null)}

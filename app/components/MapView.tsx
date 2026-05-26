@@ -304,6 +304,28 @@ export function MapView({
       const msg = e.data
       const map = mapStore.map
 
+      // DONE: always notify the UI so the spinner and track count are updated
+      // even if map sources are temporarily unavailable (e.g. during a style switch).
+      // fitBounds is handled in handleProcessingUpdate (home.tsx) — it only needs the
+      // map object, not sourcesReady.
+      if (msg.type === "DONE") {
+        onProcessingUpdateRef.current?.(msg.processedCount, true)
+
+        // Persist the computed fog cache (requires live sources)
+        if (map && mapStore.sourcesReady && mapStore.tracks.length > 0 && mapStore.fogData) {
+          saveFogCache({
+            trackIds: mapStore.tracks.map((t) => t.id).sort(),
+            fogMode: mapStore.fogMode,
+            fogData: mapStore.fogData,
+          })
+        }
+
+        // Reset after onProcessingUpdateRef so home.tsx can read the flag before it clears
+        mapStore.isRestoreReprocess = false
+        return
+      }
+
+      // FOG_UPDATE: needs live sources to push data into the map
       if (!map || !mapStore.sourcesReady) return
 
       if (msg.type === "FOG_UPDATE") {
@@ -322,40 +344,6 @@ export function MapView({
         tracksSource?.setData(featureCollection(trackFeatures))
 
         onProcessingUpdateRef.current?.(msg.processedCount, false)
-      }
-
-      if (msg.type === "DONE") {
-        onProcessingUpdateRef.current?.(msg.processedCount, true)
-
-        if (mapStore.tracks.length > 0) {
-          // Only auto-fit bounds for genuine new uploads, not restore reprocessing
-          // (restore reprocessing preserves the user's saved map position)
-          if (!mapStore.isRestoreReprocess) {
-            const fc = featureCollection(
-              mapStore.tracks.map((t) => lineString(t.coordinates))
-            )
-            const [minLng, minLat, maxLng, maxLat] = bbox(fc)
-            if (isFinite(minLng) && isFinite(minLat)) {
-              map.fitBounds(
-                [
-                  [minLng, minLat],
-                  [maxLng, maxLat],
-                ],
-                { padding: 60, maxZoom: 14 }
-              )
-            }
-          }
-          mapStore.isRestoreReprocess = false
-
-          // Persist the computed fog so the next page load can skip reprocessing
-          if (mapStore.fogData) {
-            saveFogCache({
-              trackIds: mapStore.tracks.map((t) => t.id).sort(),
-              fogMode: mapStore.fogMode,
-              fogData: mapStore.fogData,
-            })
-          }
-        }
       }
     }
   }, [])

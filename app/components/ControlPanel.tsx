@@ -1,4 +1,5 @@
 import { useRef } from "react"
+import { Link } from "react-router"
 import {
   Plus,
   Trash,
@@ -8,8 +9,9 @@ import {
   Globe,
   Cloud,
   Image,
+  Question,
 } from "@phosphor-icons/react"
-import { Button } from "~/components/ui/button"
+import { Button, buttonVariants } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
 import { Switch } from "~/components/ui/switch"
 import type { FogMode, MapMode } from "~/types/tracks"
@@ -168,15 +170,6 @@ export function ControlPanel({
             className="hidden"
             onChange={handleFileChange}
           />
-          <input
-            ref={photoInputRef}
-            type="file"
-            multiple
-            accept=".jpg,.jpeg,.heic,image/jpeg,image/heic"
-            className="hidden"
-            onChange={handlePhotoFileChange}
-          />
-
           <Button
             variant="default"
             size="sm"
@@ -187,25 +180,47 @@ export function ControlPanel({
             Add files
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => photoInputRef.current?.click()}
-            title="Add photos (JPEG/HEIC)"
-          >
-            <Image weight="bold" className="mr-1.5" />
-            Add photos
-          </Button>
+          {trackCount > 0 && (
+            <>
+              <input
+                ref={photoInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoFileChange}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => photoInputRef.current?.click()}
+                title="Add photos (JPEG/HEIC)"
+              >
+                <Image weight="bold" className="mr-1.5" />
+                Add photos
+              </Button>
+            </>
+          )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClearAll}
-            disabled={isProcessing || trackCount === 0}
+          {trackCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClearAll}
+              disabled={isProcessing || trackCount === 0}
+            >
+              <Trash weight="bold" className="mr-1.5" />
+              Clear all
+            </Button>
+          )}
+
+          <Link
+            to="/help"
+            title="Help"
+            className={buttonVariants({ variant: "outline", size: "icon-sm" })}
           >
-            <Trash weight="bold" className="mr-1.5" />
-            Clear all
-          </Button>
+            <Question weight="bold" size={16} />
+          </Link>
 
           {isProcessing ? (
             <Badge variant="secondary" className="tabular-nums">

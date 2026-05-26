@@ -1,5 +1,6 @@
 import { useRef } from "react"
-import { UploadSimple } from "@phosphor-icons/react"
+import { Link } from "react-router"
+import { FlaskIcon, UploadIcon } from "@phosphor-icons/react"
 import {
   Dialog,
   DialogContent,
@@ -13,9 +14,15 @@ interface FileUploadDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddFiles: (files: FileList) => void
+  onLoadSampleData: () => void
 }
 
-export function FileUploadDialog({ open, onOpenChange, onAddFiles }: FileUploadDialogProps) {
+export function FileUploadDialog({
+  open,
+  onOpenChange,
+  onAddFiles,
+  onLoadSampleData,
+}: FileUploadDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -44,15 +51,34 @@ export function FileUploadDialog({ open, onOpenChange, onAddFiles }: FileUploadD
           className="hidden"
           onChange={handleFileChange}
         />
-        <div className="flex gap-3 pt-2">
-          <Button
-            className="flex-1"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <UploadSimple weight="bold" className="mr-2" />
-            Select files
-          </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <Link
+          to="/help"
+          className="text-xs text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+        >
+          New to Fog of Walk? Learn how it works →
+        </Link>
+        <div className="flex flex-col gap-3 pt-2">
+          <div className="flex gap-3">
+            <Button
+              autoFocus
+              className="flex-1"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadIcon weight="bold" className="mr-2" />
+              Select files
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false)
+                onLoadSampleData()
+              }}
+            >
+              <FlaskIcon weight="bold" className="mr-2" />
+              Try sample
+            </Button>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Skip for now
           </Button>
         </div>
