@@ -203,6 +203,7 @@ export default function Home() {
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [photos, setPhotos] = useState<PhotoEntry[]>(_restoredPhotos)
+  const [showPhotos, setShowPhotos] = useState(true)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
   const [photoErrorOpen, setPhotoErrorOpen] = useState(false)
   // Loading overlay: starts visible, fades out when map is ready, then unmounts
@@ -392,6 +393,7 @@ export default function Home() {
           onTrackSelect={setSelectedTrackId}
           mapMode={mapMode}
           photos={photos}
+          showPhotos={showPhotos}
           onPhotoSelect={setSelectedGroup}
         />
       </ErrorBoundary>
@@ -413,6 +415,8 @@ export default function Home() {
             onClearAll={handleClearAll}
             photoCount={photos.length}
             onAddPhotos={handleAddPhotos}
+            showPhotos={showPhotos}
+            onShowPhotosChange={setShowPhotos}
           />
           <FileUploadDialog
             open={showUploadDialog}

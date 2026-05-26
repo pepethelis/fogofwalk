@@ -147,6 +147,7 @@ interface MapViewProps {
   onTrackSelect: (id: string | null) => void
   mapMode: MapMode
   photos: PhotoEntry[]
+  showPhotos: boolean
   onPhotoSelect: (group: PhotoGroup | null) => void
 }
 
@@ -159,6 +160,7 @@ export function MapView({
   onTrackSelect,
   mapMode,
   photos,
+  showPhotos,
   onPhotoSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -178,6 +180,8 @@ export function MapView({
   const photoMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
   const photosRef = useRef<PhotoEntry[]>(photos)
   photosRef.current = photos
+  const showPhotosRef = useRef(showPhotos)
+  showPhotosRef.current = showPhotos
 
   const clusterCacheRef = useRef<Map<number, PhotoGroup[]>>(new Map())
 
@@ -188,7 +192,7 @@ export function MapView({
     photoMarkersRef.current.forEach((m) => m.remove())
     photoMarkersRef.current.clear()
 
-    if (photosRef.current.length === 0) return
+    if (!showPhotosRef.current || photosRef.current.length === 0) return
 
     const zoom = Math.round(map.getZoom())
     let clusters = clusterCacheRef.current.get(zoom)
@@ -452,7 +456,7 @@ export function MapView({
   useEffect(() => {
     clusterCacheRef.current.clear()
     rebuildPhotoMarkers()
-  }, [photos, rebuildPhotoMarkers])
+  }, [photos, showPhotos, rebuildPhotoMarkers])
 
   return <div ref={containerRef} className="absolute inset-0 h-screen" />
 }

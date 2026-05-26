@@ -33,6 +33,8 @@ interface ControlPanelProps {
   onClearAll: () => void
   photoCount: number
   onAddPhotos: (files: FileList) => void
+  showPhotos: boolean
+  onShowPhotosChange: (value: boolean) => void
 }
 
 export function ControlPanel({
@@ -51,6 +53,8 @@ export function ControlPanel({
   onClearAll,
   photoCount,
   onAddPhotos,
+  showPhotos,
+  onShowPhotosChange,
 }: ControlPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -132,6 +136,27 @@ export function ControlPanel({
             </label>
           </div>
 
+          {photoCount > 0 && (
+            <div className="flex items-center gap-2">
+              <Image
+                weight="duotone"
+                className="text-muted-foreground"
+                size={16}
+              />
+              <Switch
+                id="show-photos"
+                checked={showPhotos}
+                onCheckedChange={onShowPhotosChange}
+              />
+              <label
+                htmlFor="show-photos"
+                className="cursor-pointer text-sm text-muted-foreground select-none"
+              >
+                Photos
+              </label>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
               <Button
@@ -180,7 +205,7 @@ export function ControlPanel({
             Add files
           </Button>
 
-          {trackCount > 0 && (
+          {trackCount > 0 && showPhotos && (
             <>
               <input
                 ref={photoInputRef}
@@ -231,7 +256,7 @@ export function ControlPanel({
               {trackCount} track{trackCount !== 1 ? "s" : ""}
             </Badge>
           ) : null}
-          {photoCount > 0 && (
+          {photoCount > 0 && showPhotos && (
             <Badge variant="secondary" className="tabular-nums">
               {photoCount} photo{photoCount !== 1 ? "s" : ""}
             </Badge>
