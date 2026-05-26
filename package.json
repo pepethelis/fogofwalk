@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && mv build/client/* build && rm -rf build/client",
+    "build": "react-router build && mv build/client/* build && rm -rf build/client && cp build/index.html build/404.html",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
