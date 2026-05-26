@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from "react"
-import { CaretLeft, CaretRight, DownloadSimple } from "@phosphor-icons/react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { CaretLeft, CaretRight, Copy, DownloadSimple } from "@phosphor-icons/react"
 import type { ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry } from "~/types/photos"
 import {
@@ -12,21 +12,25 @@ import {
 import { Button } from "~/components/ui/button"
 import {
   type StatKey,
+  type BackgroundMode,
   STAT_DEFS,
   CARD_WIDTH,
   CARD_HEIGHT,
   drawShareCard,
   exportShareCard,
+  copyShareCard,
   getAvailableStats,
   getDefaultStats,
   filterPhotosForTrack,
 } from "~/lib/shareCard"
+import { ShareMapView } from "~/components/ShareMapView"
 
 // ─── Preview dimensions (1/4 scale of 1080×1440) ─────────────────────────────
 const PREVIEW_W = 270
 const PREVIEW_H = 360
 
 const MAX_SELECTED = 4
+const BLUR_PRESETS = [0, 2, 4, 6, 8, 12, 20]
 
 interface ShareDialogProps {
   open: boolean
@@ -47,43 +51,123 @@ export function ShareDialog({
   )
   const availableStats = useMemo(() => getAvailableStats(track), [track])
 
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>(() =>
+    trackPhotos.length > 0 ? "photo" : "dark"
+  )
+  const [blurAmount, setBlurAmount] = useState(6)
+  const [mapBaseSnapshot, setMapBaseSnapshot] = useState<ImageBitmap | null>(null)
+  const [mapTrackPoints, setMapTrackPoints] = useState<{ x: number; y: number }[] | null>(null)
+  const [isMapReady, setIsMapReady] = useState(false)
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [enabledStats, setEnabledStats] = useState<StatKey[]>(() =>
     getDefaultStats(track)
   )
   const [isExporting, setIsExporting] = useState(false)
+  const [isCopying, setIsCopying] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const previewRef = useRef<HTMLCanvasElement>(null)
 
-  // Re-render preview whenever state changes
+  // Clean up map snapshot when switching away from map mode
   useEffect(() => {
-    const canvas = previewRef.current
-    if (!canvas) return
-    // Set internal resolution (CSS size is controlled via style)
-    canvas.width = CARD_WIDTH
-    canvas.height = CARD_HEIGHT
-    const photo = trackPhotos[selectedPhotoIndex] ?? null
-    drawShareCard(canvas, { track, photo, enabledStats })
-  }, [selectedPhotoIndex, enabledStats, track, trackPhotos])
+    if (backgroundMode !== "map") {
+      setMapBaseSnapshot((prev) => {
+        prev?.close()
+        return null
+      })
+      setMapTrackPoints(null)
+      setIsMapReady(false)
+    }
+  }, [backgroundMode])
+
+  // Called by ShareMapView once base map + projected track points are ready
+  const handleMapReady = useCallback(
+    (baseMap: ImageBitmap, trackPoints: { x: number; y: number }[]) => {
+      setMapBaseSnapshot(baseMap)
+      setMapTrackPoints(trackPoints)
+      setIsMapReady(true)
+    },
+    []
+  )
+
+  // Re-render preview whenever relevant state changes.
+  // `open` is in deps so this fires when the Base UI portal first commits the canvas to DOM.
+  // requestAnimationFrame defers past the portal's own paint so previewRef is guaranteed set.
+  useEffect(() => {
+    if (!open) return
+    const raf = requestAnimationFrame(() => {
+      const canvas = previewRef.current
+      if (!canvas) return
+      canvas.width = CARD_WIDTH
+      canvas.height = CARD_HEIGHT
+      const photo = trackPhotos[selectedPhotoIndex] ?? null
+      drawShareCard(canvas, {
+        track,
+        photo,
+        mapBaseSnapshot,
+        mapTrackPoints,
+        backgroundMode,
+        blurAmount,
+        enabledStats,
+      })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [
+    open,
+    selectedPhotoIndex,
+    enabledStats,
+    track,
+    trackPhotos,
+    backgroundMode,
+    blurAmount,
+    mapBaseSnapshot,
+    mapTrackPoints,
+  ])
 
   function toggleStat(key: StatKey) {
     setEnabledStats((prev) => {
       if (prev.includes(key)) {
-        // Deselect — keep at least 1 stat
         if (prev.length <= 1) return prev
         return prev.filter((k) => k !== key)
       }
-      // Select — FIFO swap when already at max
       if (prev.length < MAX_SELECTED) return [...prev, key]
       return [...prev.slice(1), key]
     })
+  }
+
+  async function handleCopy() {
+    setIsCopying(true)
+    try {
+      const photo = trackPhotos[selectedPhotoIndex] ?? null
+      await copyShareCard({
+        track,
+        photo,
+        mapBaseSnapshot,
+        mapTrackPoints,
+        backgroundMode,
+        blurAmount,
+        enabledStats,
+      })
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } finally {
+      setIsCopying(false)
+    }
   }
 
   async function handleExport() {
     setIsExporting(true)
     try {
       const photo = trackPhotos[selectedPhotoIndex] ?? null
-      await exportShareCard({ track, photo, enabledStats })
+      await exportShareCard({
+        track,
+        photo,
+        mapBaseSnapshot,
+        mapTrackPoints,
+        backgroundMode,
+        blurAmount,
+        enabledStats,
+      })
     } finally {
       setIsExporting(false)
     }
@@ -92,8 +176,19 @@ export function ShareDialog({
   const hasPrev = selectedPhotoIndex > 0
   const hasNext = selectedPhotoIndex < trackPhotos.length - 1
 
+  const bgModes: { key: BackgroundMode; label: string }[] = [
+    { key: "photo", label: "Photo" },
+    { key: "dark", label: "Dark" },
+    { key: "map", label: "Map" },
+  ]
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Off-screen map renderer — mounted only when map mode is active */}
+      {backgroundMode === "map" && (
+        <ShareMapView track={track} onReady={handleMapReady} />
+      )}
+
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Share activity</DialogTitle>
@@ -107,20 +202,44 @@ export function ShareDialog({
               width: PREVIEW_W,
               height: PREVIEW_H,
               display: "block",
-              // Slightly round the preview card corners
               borderRadius: 4,
-              // Prevent blurry upscaling if CSS size > canvas px
               imageRendering: "auto",
             }}
           />
+          {backgroundMode === "map" && !isMapReady && (
+            <span
+              className="pointer-events-none absolute text-xs text-muted-foreground"
+              style={{ marginTop: PREVIEW_H / 2 - 8 }}
+            >
+              Rendering map…
+            </span>
+          )}
         </div>
 
-        {/* ── Photo background navigation ───────────────────────────────── */}
-        {trackPhotos.length > 0 ? (
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              Photo background
-            </span>
+        {/* ── Background mode selector ──────────────────────────────────── */}
+        <div className="flex flex-col gap-2">
+          <span className="text-xs text-muted-foreground">Background</span>
+          <div className="flex gap-1.5">
+            {bgModes.map(({ key, label }) => {
+              if (key === "photo" && trackPhotos.length === 0) return null
+              return (
+                <Button
+                  key={key}
+                  size="xs"
+                  variant={backgroundMode === key ? "default" : "outline"}
+                  onClick={() => setBackgroundMode(key)}
+                >
+                  {label}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Photo navigation (only in photo mode, multiple photos) ────── */}
+        {backgroundMode === "photo" && trackPhotos.length > 1 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs text-muted-foreground">Photo</span>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -145,10 +264,25 @@ export function ShareDialog({
               </Button>
             </div>
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No photos linked to this track — showing route on dark background.
-          </p>
+        )}
+
+        {/* ── Blur buttons (hidden in dark mode) ───────────────────────── */}
+        {backgroundMode !== "dark" && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs text-muted-foreground">Blur</span>
+            <div className="flex flex-wrap gap-1.5">
+              {BLUR_PRESETS.map((v) => (
+                <Button
+                  key={v}
+                  size="xs"
+                  variant={blurAmount === v ? "default" : "outline"}
+                  onClick={() => setBlurAmount(v)}
+                >
+                  {v}px
+                </Button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* ── Stats toggles ─────────────────────────────────────────────── */}
@@ -183,12 +317,21 @@ export function ShareDialog({
             variant="outline"
             size="sm"
             onClick={() => onOpenChange(false)}
-            disabled={isExporting}
+            disabled={isExporting || isCopying}
           >
             Cancel
           </Button>
-          <Button size="sm" onClick={handleExport} disabled={isExporting}>
-            <DownloadSimple weight="duotone" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            disabled={isCopying || isExporting}
+          >
+            <Copy weight="bold" />
+            {copied ? "Copied!" : isCopying ? "Copying…" : "Copy PNG"}
+          </Button>
+          <Button size="sm" onClick={handleExport} disabled={isExporting || isCopying}>
+            <DownloadSimple weight="bold" />
             {isExporting ? "Exporting…" : "Download PNG"}
           </Button>
         </DialogFooter>

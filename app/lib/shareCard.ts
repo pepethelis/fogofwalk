@@ -34,14 +34,13 @@ const FONT_FAMILY = "'JetBrains Mono Variable', 'JetBrains Mono', monospace"
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
+/** Duration without seconds: "1:24" (1h 24m) or "45" (45 min). */
 function fmtDuration(ms: number): string {
-  const totalSec = Math.round(ms / 1000)
-  const h = Math.floor(totalSec / 3600)
-  const m = Math.floor((totalSec % 3600) / 60)
-  const s = totalSec % 60
-  if (h > 0)
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-  return `${m}:${String(s).padStart(2, "0")}`
+  const totalMin = Math.round(ms / 60000)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}`
+  return String(m)
 }
 
 function fmtPace(minPerKm: number): string {
@@ -56,47 +55,47 @@ export const STAT_DEFS: Record<StatKey, StatDef> = {
   distance: {
     label: "Distance",
     getValue: (t) => t.stats.distanceKm.toFixed(2),
-    unit: "km",
+    unit: "distance (km)",
   },
   duration: {
     label: "Duration",
     getValue: (t) => fmtDuration(t.stats.durationMs ?? 0),
-    unit: "duration",
+    unit: "duration (h:m)",
   },
   movingTime: {
     label: "Moving time",
     getValue: (t) => fmtDuration(t.stats.movingTimeMs ?? 0),
-    unit: "moving",
+    unit: "moving time (h:m)",
   },
   avgPace: {
-    label: "Avg pace",
+    label: "Avg. pace",
     getValue: (t) => fmtPace(t.stats.avgPaceMinPerKm ?? 0),
-    unit: "min / km",
+    unit: "avg. pace (min/km)",
   },
   avgMovingPace: {
     label: "Moving pace",
     getValue: (t) => fmtPace(t.stats.avgMovingPaceMinPerKm ?? 0),
-    unit: "mov / km",
+    unit: "aoving pace (min/km)",
   },
   avgSpeed: {
-    label: "Speed",
+    label: "Avg. speed",
     getValue: (t) => (t.stats.avgSpeedKmh ?? 0).toFixed(1),
-    unit: "km / h",
+    unit: "avg. speed (km/h)",
   },
   avgMovingSpeed: {
     label: "Moving speed",
     getValue: (t) => (t.stats.avgMovingSpeedKmh ?? 0).toFixed(1),
-    unit: "mov km / h",
+    unit: "moving speed (km/h)",
   },
   elevationGain: {
-    label: "Elev. gain",
+    label: "Elevation gain",
     getValue: (t) => Math.round(t.stats.elevationGainM).toString(),
-    unit: "m  ↑",
+    unit: "elevation gain (m)",
   },
   elevationLoss: {
-    label: "Elev. loss",
+    label: "Elevation loss",
     getValue: (t) => Math.round(t.stats.elevationLossM).toString(),
-    unit: "m  ↓",
+    unit: "elevation loss (m)",
   },
 }
 
@@ -164,9 +163,7 @@ function drawRoute(
   // Subsample for performance on very long tracks
   const MAX_PTS = 2000
   const step =
-    coordinates.length > MAX_PTS
-      ? Math.ceil(coordinates.length / MAX_PTS)
-      : 1
+    coordinates.length > MAX_PTS ? Math.ceil(coordinates.length / MAX_PTS) : 1
   const pts = coordinates.filter((_, i) => i % step === 0)
 
   const lngs = pts.map((c) => c[0])
@@ -225,13 +222,96 @@ function drawRoute(
   ctx.restore()
 }
 
+/** Draw the route using pre-projected canvas pixel coordinates (map mode). */
+function drawRouteFromPixels(
+  ctx: CanvasRenderingContext2D,
+  points: { x: number; y: number }[]
+): void {
+  if (points.length < 2) return
+
+  const buildPath = () => {
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, points[0].y)
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y)
+    }
+  }
+
+  // Soft glow
+  ctx.save()
+  ctx.strokeStyle = `${TRACK_COLOR}50`
+  ctx.lineWidth = 22
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
+  ctx.shadowColor = TRACK_COLOR
+  ctx.shadowBlur = 30
+  buildPath()
+  ctx.stroke()
+  ctx.restore()
+
+  // Main line
+  ctx.save()
+  ctx.strokeStyle = TRACK_COLOR
+  ctx.lineWidth = 7
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
+  buildPath()
+  ctx.stroke()
+  ctx.restore()
+}
+
 // ─── Main draw function ───────────────────────────────────────────────────────
+
+export type BackgroundMode = "photo" | "dark" | "map"
 
 export interface ShareCardOptions {
   track: ParsedTrack
   photo: PhotoEntry | null
+  /** Base map bitmap (tiles only, no track layer) — safe to blur. */
+  mapBaseSnapshot: ImageBitmap | null
+  /** Track path in canvas-pixel space, projected by MapLibre — drawn unblurred on top. */
+  mapTrackPoints: { x: number; y: number }[] | null
+  backgroundMode: BackgroundMode
+  blurAmount: number // 0–20 px, applied when backgroundMode is "photo" or "map"
   enabledStats: StatKey[]
 }
+
+// ─── Image background helper ──────────────────────────────────────────────────
+
+/**
+ * Draw a bitmap (photo or map snapshot) scaled to cover the canvas, with an
+ * optional Gaussian blur and a dark veil on top.
+ */
+function drawImageBackground(
+  ctx: CanvasRenderingContext2D,
+  bitmap: ImageBitmap,
+  W: number,
+  H: number,
+  blurAmount: number,
+  darkOverlay: number // 0–1 opacity
+): void {
+  const scale = Math.max(W / bitmap.width, H / bitmap.height)
+  const sw = bitmap.width * scale
+  const sh = bitmap.height * scale
+  const sx = (W - sw) / 2
+  const sy = (H - sh) / 2
+
+  if (blurAmount > 0) {
+    // Extend beyond edges so the blur kernel never samples transparent pixels
+    const EXT = blurAmount * 2
+    ctx.save()
+    ctx.filter = `blur(${blurAmount}px)`
+    ctx.drawImage(bitmap, sx - EXT, sy - EXT, sw + EXT * 2, sh + EXT * 2)
+    ctx.restore()
+  } else {
+    ctx.drawImage(bitmap, sx, sy, sw, sh)
+  }
+
+  ctx.fillStyle = `rgba(10, 10, 30, ${darkOverlay})`
+  ctx.fillRect(0, 0, W, H)
+}
+
+// ─── Main draw function ───────────────────────────────────────────────────────
 
 export async function drawShareCard(
   canvas: HTMLCanvasElement,
@@ -240,7 +320,15 @@ export async function drawShareCard(
   // Ensure web fonts are loaded before measuring / drawing text
   await document.fonts.ready
 
-  const { track, photo, enabledStats } = opts
+  const {
+    track,
+    photo,
+    mapBaseSnapshot,
+    mapTrackPoints,
+    backgroundMode,
+    blurAmount,
+    enabledStats,
+  } = opts
   const ctx = canvas.getContext("2d")
   if (!ctx) return
 
@@ -251,34 +339,26 @@ export async function drawShareCard(
 
   // ── Background ────────────────────────────────────────────────────────────
 
-  if (photo?.file) {
+  if (backgroundMode === "photo" && photo?.file) {
     const bitmap = await createImageBitmap(photo.file)
-
-    // Scale to cover the entire canvas (like CSS object-fit: cover)
-    const scale = Math.max(W / bitmap.width, H / bitmap.height)
-    const sw = bitmap.width * scale
-    const sh = bitmap.height * scale
-    const sx = (W - sw) / 2
-    const sy = (H - sh) / 2
-
-    // Extend image beyond edges to prevent white fringe from Gaussian blur
-    const BLUR = 42
-    const EXT = BLUR * 2
-    ctx.save()
-    ctx.filter = `blur(${BLUR}px)`
-    ctx.drawImage(bitmap, sx - EXT, sy - EXT, sw + EXT * 2, sh + EXT * 2)
-    ctx.restore()
-
+    drawImageBackground(ctx, bitmap, W, H, blurAmount, 0.52)
     bitmap.close()
-
-    // Dark veil over the blurred photo
-    ctx.fillStyle = "rgba(10, 10, 30, 0.52)"
-    ctx.fillRect(0, 0, W, H)
+    drawRoute(ctx, track, W, H)
+  } else if (backgroundMode === "map" && mapBaseSnapshot) {
+    // Blur only the base map tiles (track layer was not present when captured)
+    drawImageBackground(ctx, mapBaseSnapshot, W, H, blurAmount, 0.35)
+    // Draw track on top, unblurred, using MapLibre-projected pixel coordinates
+    if (mapTrackPoints && mapTrackPoints.length >= 2) {
+      drawRouteFromPixels(ctx, mapTrackPoints)
+    }
   } else {
-    // No photo → route on dark background
+    // "dark" mode — or map mode while the snapshot is still loading (blank dark,
+    // no route, so no ghost line appears while "Rendering map…" is shown)
     ctx.fillStyle = FOG_COLOR
     ctx.fillRect(0, 0, W, H)
-    drawRoute(ctx, track, W, H)
+    if (backgroundMode === "dark") {
+      drawRoute(ctx, track, W, H)
+    }
   }
 
   // ── Gradient scrim (bottom portion) ──────────────────────────────────────
@@ -299,6 +379,7 @@ export async function drawShareCard(
   const ROWS = Math.ceil(statCount / COLS)
 
   const PAD_X = 80
+  const CELL_INNER_PAD = 50 // extra left padding for cols > 0 (gap from divider)
   const CELL_W = (W - PAD_X * 2) / COLS
   const CELL_H = 192
   const BOTTOM_RESERVE = 76 // space below stats for watermark
@@ -328,7 +409,7 @@ export async function drawShareCard(
     const col = i % COLS
     const row = Math.floor(i / COLS)
 
-    const cellX = PAD_X + col * CELL_W
+    const cellX = PAD_X + col * CELL_W + (col > 0 ? CELL_INNER_PAD : 0)
     const cellY = STATS_TOP + row * CELL_H
 
     // Large value
@@ -353,17 +434,47 @@ export async function drawShareCard(
   // ── Watermark ─────────────────────────────────────────────────────────────
 
   ctx.save()
-  // letterSpacing: supported Chrome 99+, Safari 17.2+; guarded at runtime for older browsers
-  if ("letterSpacing" in ctx) ctx.letterSpacing = "4px"
   ctx.font = `400 19px ${FONT_FAMILY}`
   ctx.fillStyle = "rgba(255, 255, 255, 0.26)"
   ctx.textAlign = "right"
   ctx.textBaseline = "alphabetic"
-  ctx.fillText("FOG OF WALK", W - PAD_X, H - 30)
+  ctx.fillText("fog-of-walk.mykhailo.net", W - PAD_X, H - 30)
   ctx.restore()
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────────
+// ─── Export / Copy ────────────────────────────────────────────────────────────
+
+/** Render a full-res 1080×1440 card and copy it to the clipboard as a PNG. */
+export async function copyShareCard(opts: ShareCardOptions): Promise<void> {
+  const canvas = document.createElement("canvas")
+  canvas.width = CARD_WIDTH
+  canvas.height = CARD_HEIGHT
+  canvas.style.cssText = "position:absolute;left:-9999px;top:-9999px"
+  document.body.appendChild(canvas)
+
+  try {
+    await drawShareCard(canvas, opts)
+
+    await new Promise<void>((resolve, reject) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          reject(new Error("Canvas toBlob returned null"))
+          return
+        }
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob }),
+          ])
+          resolve()
+        } catch (err) {
+          reject(err)
+        }
+      }, "image/png")
+    })
+  } finally {
+    document.body.removeChild(canvas)
+  }
+}
 
 /** Render a full-res 1080×1440 card and trigger a PNG download. */
 export async function exportShareCard(opts: ShareCardOptions): Promise<void> {
@@ -378,26 +489,23 @@ export async function exportShareCard(opts: ShareCardOptions): Promise<void> {
     await drawShareCard(canvas, opts)
 
     await new Promise<void>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error("Canvas toBlob returned null"))
-            return
-          }
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement("a")
-          const safeName = opts.track.name
-            .replace(/[^a-z0-9]+/gi, "-")
-            .replace(/^-|-$/g, "")
-            .toLowerCase()
-          a.href = url
-          a.download = `fogofwalk-${safeName || "activity"}.png`
-          a.click()
-          setTimeout(() => URL.revokeObjectURL(url), 2000)
-          resolve()
-        },
-        "image/png"
-      )
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Canvas toBlob returned null"))
+          return
+        }
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        const safeName = opts.track.name
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-|-$/g, "")
+          .toLowerCase()
+        a.href = url
+        a.download = `fogofwalk-${safeName || "activity"}.png`
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 2000)
+        resolve()
+      }, "image/png")
     })
   } finally {
     document.body.removeChild(canvas)
