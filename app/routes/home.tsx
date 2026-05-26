@@ -94,19 +94,33 @@ export async function clientLoader(): Promise<{
     if (fogCache && isFogCacheValid(fogCache, trackIds, restoredFogMode)) {
       // Cache hit: restore fog directly — setupMapLayers will use mapStore.fogData
       mapStore.fogData = fogCache.fogData
-      console.debug("[clientLoader] restored fog cache for", tracks.length, "tracks")
+      console.debug(
+        "[clientLoader] restored fog cache for",
+        tracks.length,
+        "tracks"
+      )
     } else {
       // Cache miss: fog will be null, world fog shown until worker reprocesses
       mapStore.fogData = null
       mapStore.isRestoreReprocess = true
-      console.debug("[clientLoader] fog cache stale/absent — will reprocess", tracks.length, "tracks")
+      console.debug(
+        "[clientLoader] fog cache stale/absent — will reprocess",
+        tracks.length,
+        "tracks"
+      )
     }
   }
 
   // initialCenter/initialZoom are already loaded from localStorage at mapStore module init time.
   // No async needed — they're ready before any useEffect runs.
 
-  console.debug("[clientLoader] restored", tracks.length, "tracks,", photos.length, "photos")
+  console.debug(
+    "[clientLoader] restored",
+    tracks.length,
+    "tracks,",
+    photos.length,
+    "photos"
+  )
   return {
     initialized: true,
     restoredTrackCount: tracks.length,
@@ -152,7 +166,11 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     )
     if (allTracks.length > 0) {
       mapStore.tracks.push(...allTracks)
-      mapStore.worker?.postMessage({ type: "PROCESS_TRACKS", tracks: allTracks, mode })
+      mapStore.worker?.postMessage({
+        type: "PROCESS_TRACKS",
+        tracks: allTracks,
+        mode,
+      })
       // Persist new tracks and invalidate stale fog cache
       await saveTracks(allTracks)
       await clearFogCache()
@@ -255,13 +273,19 @@ export default function Home() {
     if (mapStore.tracks.length === 0 || !map) return
 
     // Compute bbox for all tracks and check the zoom needed to fit them.
-    const allFc = featureCollection(mapStore.tracks.map((t) => lineString(t.coordinates)))
+    const allFc = featureCollection(
+      mapStore.tracks.map((t) => lineString(t.coordinates))
+    )
     const [w, s, e, n] = bbox(allFc)
     if (!isFinite(w)) return
 
-    const allBounds: [[number, number], [number, number]] = [[w, s], [e, n]]
+    const allBounds: [[number, number], [number, number]] = [
+      [w, s],
+      [e, n],
+    ]
     const camera = map.cameraForBounds(allBounds, { padding: 60, maxZoom: 14 })
-    const wouldBeZoom = typeof camera?.zoom === "number" ? camera.zoom : Infinity
+    const wouldBeZoom =
+      typeof camera?.zoom === "number" ? camera.zoom : Infinity
 
     if (wouldBeZoom >= 5) {
       // All tracks fit at an acceptable zoom level — show them all.
@@ -271,10 +295,18 @@ export default function Home() {
       // just the newly added ones so the user sees what they just uploaded.
       const newTracks = mapStore.tracks.slice(prevTrackCountRef.current)
       if (newTracks.length === 0) return
-      const newFc = featureCollection(newTracks.map((t) => lineString(t.coordinates)))
+      const newFc = featureCollection(
+        newTracks.map((t) => lineString(t.coordinates))
+      )
       const [nw, ns, ne, nn] = bbox(newFc)
       if (isFinite(nw)) {
-        map.fitBounds([[nw, ns], [ne, nn]], { padding: 60, maxZoom: 14 })
+        map.fitBounds(
+          [
+            [nw, ns],
+            [ne, nn],
+          ],
+          { padding: 60, maxZoom: 14 }
+        )
       }
     }
   }, [isProcessing])
@@ -310,7 +342,9 @@ export default function Home() {
   }
 
   function handleClearAll() {
-    photos.forEach((p) => { if (p.objectUrl) URL.revokeObjectURL(p.objectUrl) })
+    photos.forEach((p) => {
+      if (p.objectUrl) URL.revokeObjectURL(p.objectUrl)
+    })
     // Release the cached share-card map bitmap so the GPU memory is freed
     if (mapStore.shareCardCache) {
       mapStore.shareCardCache.baseMap.close()
@@ -322,9 +356,14 @@ export default function Home() {
   }
 
   async function handleAddPhotos(files: FileList) {
-    const newEntries = await processPhotoFiles(Array.from(files), mapStore.tracks, photos)
+    const newEntries = await processPhotoFiles(
+      Array.from(files),
+      mapStore.tracks,
+      photos
+    )
     if (newEntries.length > 0) {
       setPhotos((prev) => [...prev, ...newEntries])
+      setShowPhotos(true)
       savePhotos(newEntries) // fire-and-forget; quota-aware
     } else {
       setPhotoErrorOpen(true)
@@ -334,7 +373,9 @@ export default function Home() {
   async function handleLoadSampleData() {
     const response = await fetch("/sample-run.gpx")
     const blob = await response.blob()
-    const file = new File([blob], "sample-run.gpx", { type: "application/gpx+xml" })
+    const file = new File([blob], "sample-run.gpx", {
+      type: "application/gpx+xml",
+    })
     const formData = new FormData()
     formData.append("intent", "add-files")
     formData.append("mode", fogMode)
@@ -370,7 +411,7 @@ export default function Home() {
   }
 
   const selectedTrack = selectedTrackId
-    ? mapStore.tracks.find((t) => t.id === selectedTrackId) ?? null
+    ? (mapStore.tracks.find((t) => t.id === selectedTrackId) ?? null)
     : null
 
   return (
@@ -424,7 +465,10 @@ export default function Home() {
             onAddFiles={(files) => handleAddFiles(files, fogMode)}
             onLoadSampleData={handleLoadSampleData}
           />
-          <PhotoErrorDialog open={photoErrorOpen} onOpenChange={setPhotoErrorOpen} />
+          <PhotoErrorDialog
+            open={photoErrorOpen}
+            onOpenChange={setPhotoErrorOpen}
+          />
           <PhotoCard
             group={selectedGroup}
             onClose={() => setSelectedGroup(null)}
@@ -432,7 +476,7 @@ export default function Home() {
           {selectedTrack && (
             <ErrorBoundary
               fallback={(error, reset) => (
-                <div className="absolute bottom-4 right-4 z-10 w-80">
+                <div className="absolute right-4 bottom-4 z-10 w-80">
                   <ErrorCard error={error} reset={reset} className="" />
                 </div>
               )}

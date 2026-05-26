@@ -205,7 +205,7 @@ export function ControlPanel({
             Add files
           </Button>
 
-          {trackCount > 0 && showPhotos && (
+          {trackCount > 0 && (showPhotos || photoCount === 0) && (
             <>
               <input
                 ref={photoInputRef}
