@@ -29,6 +29,35 @@ export default function HelpPage() {
           How Fog of Walk works
         </h1>
 
+        {/* What is Fog of Walk */}
+        <section className="mb-10">
+          <h2 className="mb-4 text-xl font-semibold text-white">What is Fog of Walk?</h2>
+          <div className="space-y-3 text-sm leading-relaxed text-gray-300">
+            <p>
+              Fog of Walk turns your activity files into a living map of your world. The entire map
+              starts covered in fog — and every route you've ever walked, run, or cycled gradually
+              clears it away, revealing the areas you've actually explored.
+            </p>
+            <p>
+              It's a way to see your city (or the world) through the lens of your own movement.
+              After importing your activities you'll quickly spot the neighbourhoods you know well,
+              the streets you've never set foot on, and the blank patches just waiting to be
+              discovered.
+            </p>
+            <p>
+              <strong className="text-white">Why people use it:</strong>
+            </p>
+            <ul className="ml-4 list-disc space-y-1 text-gray-400">
+              <li>Visualise how much of your city you've explored over months or years</li>
+              <li>Set a goal to clear a whole district, borough, or country</li>
+              <li>Find new routes by spotting the gaps in the fog near familiar areas</li>
+              <li>Attach photos to your routes and build a personal map of memories</li>
+            </ul>
+          </div>
+        </section>
+
+        <hr className="mb-10 border-white/10" />
+
         {/* How it works */}
         <section className="mb-10">
           <h2 className="mb-4 text-xl font-semibold text-white">Workflow</h2>
