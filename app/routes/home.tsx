@@ -7,6 +7,7 @@ import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
+import { ShareDialog } from "~/components/ShareDialog"
 import { PhotoCard } from "~/components/PhotoCard"
 import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
@@ -198,6 +199,7 @@ export default function Home() {
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
+  const [showShareDialog, setShowShareDialog] = useState(false)
   const [photos, setPhotos] = useState<PhotoEntry[]>(_restoredPhotos)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
   // Loading overlay: starts visible, fades out when map is ready, then unmounts
@@ -364,8 +366,17 @@ export default function Home() {
               <TrackStatsPanel
                 track={selectedTrack}
                 onClose={() => setSelectedTrackId(null)}
+                onShare={() => setShowShareDialog(true)}
               />
             </ErrorBoundary>
+          )}
+          {showShareDialog && selectedTrack && (
+            <ShareDialog
+              open={showShareDialog}
+              onOpenChange={setShowShareDialog}
+              track={selectedTrack}
+              photos={photos}
+            />
           )}
         </>
       )}
