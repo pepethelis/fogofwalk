@@ -262,6 +262,11 @@ export default function Home() {
 
   function handleClearAll() {
     photos.forEach((p) => { if (p.objectUrl) URL.revokeObjectURL(p.objectUrl) })
+    // Release the cached share-card map bitmap so the GPU memory is freed
+    if (mapStore.shareCardCache) {
+      mapStore.shareCardCache.baseMap.close()
+      mapStore.shareCardCache = null
+    }
     const formData = new FormData()
     formData.append("intent", "clear-all")
     fetcher.submit(formData, { method: "post" })

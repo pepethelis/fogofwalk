@@ -49,7 +49,8 @@ export function ShareMapView({ track, onReady }: ShareMapViewProps) {
     const fallbackTimer = setTimeout(() => {
       if (captured) return
       captured = true
-      // Best-effort: emit whatever we have (empty bitmap fallback)
+      console.warn("[ShareMapView] map did not reach idle within 10 s — emitting partial capture")
+      // Best-effort: emit whatever we have (empty bitmap fallback, no track points)
       const canvas = map.getCanvas()
       createImageBitmap(canvas).then((bitmap) => {
         onReadyRef.current(bitmap, [])

@@ -67,6 +67,16 @@ interface MapStore {
    * position is preserved.
    */
   isRestoreReprocess: boolean
+  /**
+   * In-memory cache of the last share-card map render. Avoids re-creating a
+   * WebGL context on every dialog open. Keyed by trackId. The ImageBitmap is
+   * owned by this cache — call .close() before replacing or clearing it.
+   */
+  shareCardCache: {
+    trackId: string
+    baseMap: ImageBitmap
+    trackPoints: { x: number; y: number }[]
+  } | null
 }
 
 export const mapStore: MapStore = {
@@ -81,6 +91,7 @@ export const mapStore: MapStore = {
   initialCenter: _savedPosition?.center ?? null,
   initialZoom: _savedPosition?.zoom ?? null,
   isRestoreReprocess: false,
+  shareCardCache: null,
 }
 
 export function worldFogGeoJSON(): GeoJSON.Feature<GeoJSON.Polygon> {

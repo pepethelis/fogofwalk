@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { CaretLeft, CaretRight, Copy, DownloadSimple } from "@phosphor-icons/react"
 import type { ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry } from "~/types/photos"
+import { mapStore } from "~/lib/mapStore"
 import {
   Dialog,
   DialogContent,
@@ -65,43 +66,64 @@ export function ShareDialog({
   const [isExporting, setIsExporting] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const previewRef = useRef<HTMLCanvasElement>(null)
 
-  // Clean up map snapshot when switching away from map mode
+  // When switching to map mode, serve from cache if available (avoids a new WebGL context)
   useEffect(() => {
     if (backgroundMode !== "map") {
+      // Switching away: null out state but leave the cache intact so the next
+      // open of the same track is instant. Only close the bitmap if it is NOT
+      // the cached reference (i.e. it was created outside the cache path).
       setMapBaseSnapshot((prev) => {
-        prev?.close()
+        if (prev && mapStore.shareCardCache?.baseMap !== prev) prev.close()
         return null
       })
       setMapTrackPoints(null)
       setIsMapReady(false)
+      return
     }
-  }, [backgroundMode])
+    // Switching to map mode: check the cache first
+    const cached = mapStore.shareCardCache
+    if (cached?.trackId === track.id) {
+      setMapBaseSnapshot(cached.baseMap)
+      setMapTrackPoints(cached.trackPoints)
+      setIsMapReady(true)
+    }
+  }, [backgroundMode, track.id])
 
   // Called by ShareMapView once base map + projected track points are ready
   const handleMapReady = useCallback(
     (baseMap: ImageBitmap, trackPoints: { x: number; y: number }[]) => {
+      // Update cache (close previous entry if it's for a different track)
+      if (mapStore.shareCardCache && mapStore.shareCardCache.trackId !== track.id) {
+        mapStore.shareCardCache.baseMap.close()
+      }
+      mapStore.shareCardCache = { trackId: track.id, baseMap, trackPoints }
       setMapBaseSnapshot(baseMap)
       setMapTrackPoints(trackPoints)
       setIsMapReady(true)
     },
-    []
+    [track.id]
   )
 
   // Re-render preview whenever relevant state changes.
   // `open` is in deps so this fires when the Base UI portal first commits the canvas to DOM.
   // requestAnimationFrame defers past the portal's own paint so previewRef is guaranteed set.
+  // The callback is async so drawShareCard's internal awaits (fonts.ready, createImageBitmap)
+  // run in the correct order — without await the first photo-mode paint would flash blank.
   useEffect(() => {
     if (!open) return
-    const raf = requestAnimationFrame(() => {
+    const raf = requestAnimationFrame(async () => {
       const canvas = previewRef.current
       if (!canvas) return
+      // Canvas internal resolution = full card (1080×1440); CSS size = 270×360 (¼ scale).
+      // The browser scales down automatically — intentional, not a bug.
       canvas.width = CARD_WIDTH
       canvas.height = CARD_HEIGHT
       const photo = trackPhotos[selectedPhotoIndex] ?? null
-      drawShareCard(canvas, {
+      await drawShareCard(canvas, {
         track,
         photo,
         mapBaseSnapshot,
@@ -137,6 +159,7 @@ export function ShareDialog({
 
   async function handleCopy() {
     setIsCopying(true)
+    setActionError(null)
     try {
       const photo = trackPhotos[selectedPhotoIndex] ?? null
       await copyShareCard({
@@ -150,6 +173,11 @@ export function ShareDialog({
       })
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      // Clipboard API unavailable (non-HTTPS, Firefox without permission, etc.)
+      const msg = err instanceof Error ? err.message : "Copy failed"
+      setActionError(msg)
+      setTimeout(() => setActionError(null), 4000)
     } finally {
       setIsCopying(false)
     }
@@ -157,6 +185,7 @@ export function ShareDialog({
 
   async function handleExport() {
     setIsExporting(true)
+    setActionError(null)
     try {
       const photo = trackPhotos[selectedPhotoIndex] ?? null
       await exportShareCard({
@@ -168,6 +197,10 @@ export function ShareDialog({
         blurAmount,
         enabledStats,
       })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Export failed"
+      setActionError(msg)
+      setTimeout(() => setActionError(null), 4000)
     } finally {
       setIsExporting(false)
     }
@@ -184,8 +217,10 @@ export function ShareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Off-screen map renderer — mounted only when map mode is active */}
-      {backgroundMode === "map" && (
+      {/* Off-screen map renderer — mounted only when map mode is active and no cached data.
+          Once isMapReady is true the result is stored in mapStore.shareCardCache and this
+          component unmounts, releasing the WebGL context. */}
+      {backgroundMode === "map" && !isMapReady && (
         <ShareMapView track={track} onReady={handleMapReady} />
       )}
 
@@ -312,6 +347,9 @@ export function ShareDialog({
         </div>
 
         {/* ── Footer ────────────────────────────────────────────────────── */}
+        {actionError && (
+          <p className="text-xs text-destructive">{actionError}</p>
+        )}
         <DialogFooter>
           <Button
             variant="outline"

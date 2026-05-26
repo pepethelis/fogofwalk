@@ -75,7 +75,7 @@ export const STAT_DEFS: Record<StatKey, StatDef> = {
   avgMovingPace: {
     label: "Moving pace",
     getValue: (t) => fmtPace(t.stats.avgMovingPaceMinPerKm ?? 0),
-    unit: "aoving pace (min/km)",
+    unit: "moving pace (min/km)",
   },
   avgSpeed: {
     label: "Avg. speed",
@@ -143,7 +143,7 @@ export function filterPhotosForTrack(
   return photos.filter((p) =>
     track.coordinates.some(
       ([lng, lat]) =>
-        Math.abs(lng - p.lng) < 1e-7 && Math.abs(lat - p.lat) < 1e-7
+        Math.abs(lng - p.lng) < 1e-5 && Math.abs(lat - p.lat) < 1e-5
     )
   )
 }
