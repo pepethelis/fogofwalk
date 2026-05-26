@@ -256,6 +256,8 @@ export function MapView({
       minZoom: 5,
       pitch: 0,
       attributionControl: { compact: true },
+      // preserveDrawingBuffer is required for map.getCanvas() capture in the share export
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     })
     mapStore.map = map
 

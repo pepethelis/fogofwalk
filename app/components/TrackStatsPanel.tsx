@@ -1,4 +1,4 @@
-import { X } from "@phosphor-icons/react"
+import { X, ShareNetwork } from "@phosphor-icons/react"
 import type { ParsedTrack } from "~/types/tracks"
 import {
   Card,
@@ -14,6 +14,7 @@ import { useDraggable } from "~/lib/useDraggable"
 interface TrackStatsPanelProps {
   track: ParsedTrack
   onClose: () => void
+  onShare?: () => void
 }
 
 function formatDuration(ms: number): string {
@@ -70,7 +71,7 @@ const EMPTY_STATS = {
   elevationProfile: [],
 } as const
 
-export function TrackStatsPanel({ track, onClose }: TrackStatsPanelProps) {
+export function TrackStatsPanel({ track, onClose, onShare }: TrackStatsPanelProps) {
   // stats may be absent on tracks loaded before this field was added (HMR / future compat)
   const stats = track.stats ?? EMPTY_STATS
   const { style, onMouseDown } = useDraggable({
@@ -87,6 +88,16 @@ export function TrackStatsPanel({ track, onClose }: TrackStatsPanelProps) {
         >
           <CardTitle className="truncate">{track.name}</CardTitle>
           <CardAction>
+            {onShare && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={onShare}
+                aria-label="Share"
+              >
+                <ShareNetwork weight="duotone" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon-xs"
