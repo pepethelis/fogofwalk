@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from "react"
-import { WarningOctagon } from "@phosphor-icons/react"
+import { WarningOctagonIcon } from "@phosphor-icons/react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
 
@@ -51,7 +51,7 @@ export function ErrorCard({ error, reset, className }: ErrorCardProps) {
       <Card className="w-80 bg-background/80 backdrop-blur-md">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <WarningOctagon weight="duotone" size={20} className="text-destructive" />
+            <WarningOctagonIcon weight="duotone" size={20} className="text-destructive" />
             <CardTitle>Something went wrong</CardTitle>
           </div>
           <CardDescription>

@@ -1,16 +1,16 @@
 import { useRef } from "react"
 import { Link } from "react-router"
 import {
-  Plus,
-  Trash,
-  MapTrifold,
-  Path,
-  Mountains,
-  Globe,
-  Cloud,
-  Image,
-  Question,
-  ChartBar,
+  PlusIcon,
+  TrashIcon,
+  MapTrifoldIcon,
+  PathIcon,
+  MountainsIcon,
+  GlobeIcon,
+  CloudIcon,
+  ImageIcon,
+  QuestionIcon,
+  ChartBarIcon,
 } from "@phosphor-icons/react"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
@@ -79,7 +79,7 @@ export function ControlPanel({
       <Card className="absolute top-6 left-6 z-10 bg-background/80 backdrop-blur-md">
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <MapTrifold
+            <MapTrifoldIcon
               weight="duotone"
               className="text-muted-foreground"
               size={16}
@@ -98,7 +98,7 @@ export function ControlPanel({
           </div>
 
           <div className="flex items-center gap-2">
-            <Path
+            <PathIcon
               weight="duotone"
               className="text-muted-foreground"
               size={16}
@@ -119,7 +119,7 @@ export function ControlPanel({
           </div>
 
           <div className="flex items-center gap-2">
-            <Cloud
+            <CloudIcon
               weight="duotone"
               className="text-muted-foreground"
               size={16}
@@ -139,7 +139,7 @@ export function ControlPanel({
 
           {photoCount > 0 && (
             <div className="flex items-center gap-2">
-              <Image
+              <ImageIcon
                 weight="duotone"
                 className="text-muted-foreground"
                 size={16}
@@ -167,7 +167,7 @@ export function ControlPanel({
                 onClick={() => onMapModeChange("flat")}
                 title="Standard"
               >
-                <Globe size={13} />
+                <GlobeIcon size={13} />
               </Button>
               <Button
                 size="icon"
@@ -176,7 +176,7 @@ export function ControlPanel({
                 onClick={() => onMapModeChange("relief")}
                 title="Satellite"
               >
-                <Mountains size={13} />
+                <MountainsIcon size={13} />
               </Button>
             </div>
             <span className="text-xs text-muted-foreground select-none">
@@ -202,7 +202,7 @@ export function ControlPanel({
             onClick={() => fileInputRef.current?.click()}
             disabled={isProcessing}
           >
-            <Plus weight="bold" className="mr-1.5" />
+            <PlusIcon weight="bold" className="mr-1.5" />
             Add files
           </Button>
 
@@ -222,7 +222,7 @@ export function ControlPanel({
                 onClick={() => photoInputRef.current?.click()}
                 title="Add photos (JPEG/HEIC)"
               >
-                <Image weight="bold" className="mr-1.5" />
+                <ImageIcon weight="bold" className="mr-1.5" />
                 Add photos
               </Button>
             </>
@@ -235,7 +235,7 @@ export function ControlPanel({
               onClick={onClearAll}
               disabled={isProcessing || trackCount === 0}
             >
-              <Trash weight="bold" className="mr-1.5" />
+              <TrashIcon weight="bold" className="mr-1.5" />
               Clear all
             </Button>
           )}
@@ -245,7 +245,7 @@ export function ControlPanel({
             title="Statistics"
             className={buttonVariants({ variant: "outline", size: "icon-sm" })}
           >
-            <ChartBar weight="bold" size={16} />
+            <ChartBarIcon weight="bold" size={16} />
           </Link>
 
           <Link
@@ -253,7 +253,7 @@ export function ControlPanel({
             title="Help"
             className={buttonVariants({ variant: "outline", size: "icon-sm" })}
           >
-            <Question weight="bold" size={16} />
+            <QuestionIcon weight="bold" size={16} />
           </Link>
 
           {isProcessing ? (

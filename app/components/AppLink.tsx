@@ -1,5 +1,5 @@
 import { Link } from "react-router"
-import { ArrowLeft } from "@phosphor-icons/react"
+import { ArrowLeftIcon } from "@phosphor-icons/react"
 import { cn } from "~/lib/utils"
 
 const variants = {
@@ -18,7 +18,7 @@ interface AppLinkProps {
 export function AppLink({ to, variant = "subtle", className, title, children }: AppLinkProps) {
   return (
     <Link to={to} className={cn(variants[variant], className)} title={title}>
-      {variant === "nav" && <ArrowLeft size={16} />}
+      {variant === "nav" && <ArrowLeftIcon size={16} />}
       {children}
     </Link>
   )

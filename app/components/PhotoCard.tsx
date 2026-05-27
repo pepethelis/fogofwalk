@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { X, ArrowLeft, ArrowRight } from "@phosphor-icons/react"
+import { XIcon, ArrowLeftIcon, ArrowRightIcon } from "@phosphor-icons/react"
 import {
   Card,
   CardHeader,
@@ -49,7 +49,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
               onClick={onClose}
               aria-label="Close"
             >
-              <X weight="bold" />
+              <XIcon weight="bold" />
             </Button>
           </CardAction>
         </CardHeader>
@@ -71,7 +71,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
                 className={idx === 0 ? "invisible" : ""}
                 aria-label="Previous photo"
               >
-                <ArrowLeft weight="bold" />
+                <ArrowLeftIcon weight="bold" />
               </Button>
               <span className="text-xs text-muted-foreground tabular-nums">
                 {idx + 1} / {count}
@@ -84,7 +84,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
                 className={idx === count - 1 ? "invisible" : ""}
                 aria-label="Next photo"
               >
-                <ArrowRight weight="bold" />
+                <ArrowRightIcon weight="bold" />
               </Button>
             </div>
           )}

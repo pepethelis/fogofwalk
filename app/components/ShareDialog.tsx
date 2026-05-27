@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { CaretLeft, CaretRight, Copy, DownloadSimple } from "@phosphor-icons/react"
+import { CaretLeftIcon, CaretRightIcon, CopyIcon, DownloadSimpleIcon } from "@phosphor-icons/react"
 import type { ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry } from "~/types/photos"
 import { mapStore } from "~/lib/mapStore"
@@ -283,7 +283,7 @@ export function ShareDialog({
                 disabled={!hasPrev}
                 aria-label="Previous photo"
               >
-                <CaretLeft />
+                <CaretLeftIcon />
               </Button>
               <span className="min-w-[3rem] text-center text-xs tabular-nums">
                 {selectedPhotoIndex + 1} / {trackPhotos.length}
@@ -295,7 +295,7 @@ export function ShareDialog({
                 disabled={!hasNext}
                 aria-label="Next photo"
               >
-                <CaretRight />
+                <CaretRightIcon />
               </Button>
             </div>
           </div>
@@ -365,11 +365,11 @@ export function ShareDialog({
             onClick={handleCopy}
             disabled={isCopying || isExporting}
           >
-            <Copy weight="bold" />
+            <CopyIcon weight="bold" />
             {copied ? "Copied!" : isCopying ? "Copying…" : "Copy PNG"}
           </Button>
           <Button size="sm" onClick={handleExport} disabled={isExporting || isCopying}>
-            <DownloadSimple weight="bold" />
+            <DownloadSimpleIcon weight="bold" />
             {isExporting ? "Exporting…" : "Download PNG"}
           </Button>
         </DialogFooter>

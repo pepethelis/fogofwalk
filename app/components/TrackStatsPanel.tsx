@@ -1,4 +1,5 @@
-import { X, ShareNetwork } from "@phosphor-icons/react"
+import { useState } from "react"
+import { XIcon, ShareNetworkIcon, TrashIcon } from "@phosphor-icons/react"
 import type { ParsedTrack } from "~/types/tracks"
 import {
   Card,
@@ -8,6 +9,14 @@ import {
   CardContent,
 } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "~/components/ui/dialog"
 import { ElevationChart } from "~/components/ElevationChart"
 import { useDraggable } from "~/lib/useDraggable"
 
@@ -15,6 +24,7 @@ interface TrackStatsPanelProps {
   track: ParsedTrack
   onClose: () => void
   onShare?: () => void
+  onDelete?: () => void
 }
 
 function formatDuration(ms: number): string {
@@ -75,9 +85,11 @@ export function TrackStatsPanel({
   track,
   onClose,
   onShare,
+  onDelete,
 }: TrackStatsPanelProps) {
   // stats may be absent on tracks loaded before this field was added (HMR / future compat)
   const stats = track.stats ?? EMPTY_STATS
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const { style, onMouseDown } = useDraggable({
     x: typeof window !== "undefined" ? window.innerWidth - 336 : 0,
     y: 16,
@@ -99,7 +111,17 @@ export function TrackStatsPanel({
                 onClick={onShare}
                 aria-label="Share"
               >
-                <ShareNetwork weight="duotone" />
+                <ShareNetworkIcon weight="duotone" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setDeleteOpen(true)}
+                aria-label="Delete track"
+              >
+                <TrashIcon weight="duotone" />
               </Button>
             )}
             <Button
@@ -108,7 +130,7 @@ export function TrackStatsPanel({
               onClick={onClose}
               aria-label="Close"
             >
-              <X weight="bold" />
+              <XIcon weight="bold" />
             </Button>
           </CardAction>
         </CardHeader>
@@ -172,6 +194,33 @@ export function TrackStatsPanel({
           )}
         </CardContent>
       </Card>
+      {onDelete && (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent showCloseButton={false}>
+            <DialogHeader>
+              <DialogTitle>Delete this track?</DialogTitle>
+              <DialogDescription>
+                &ldquo;{track.name}&rdquo; will be removed and the fog map will
+                be recalculated. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setDeleteOpen(false)
+                  onDelete()
+                }}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

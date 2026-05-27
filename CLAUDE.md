@@ -102,6 +102,8 @@ Photos do **not** need GPS/geotag data. Location is determined entirely by match
 
 ## Key gotchas
 
+**Phosphor icons — always use the `Icon` suffix**: `@phosphor-icons/react` exports every icon both as `Trash` and `TrashIcon`; the suffix-free names are deprecated. Always import and use the `*Icon` form — `TrashIcon`, `XIcon`, `PlusIcon`, etc. Never import the bare name.
+
 **FIT coordinates**: `fit-file-parser` already returns degrees — do NOT multiply by `180/2^31`. Pre-GPS-lock records have near-zero coordinates; filter with `Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001`.
 
 **Worker URL**: must use relative path `"../workers/fogWorker.ts"` in `new Worker()` — the `~` alias does NOT work for worker URLs (only for imports inside worker files, covered by vite.config.ts `worker.plugins`).

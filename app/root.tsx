@@ -6,7 +6,7 @@ import {
   ScrollRestoration,
   isRouteErrorResponse,
 } from "react-router"
-import { WarningOctagon } from "@phosphor-icons/react"
+import { WarningOctagonIcon } from "@phosphor-icons/react"
 
 import type { Route } from "./+types/root"
 import "./app.css"
@@ -66,7 +66,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       />
       <div className="relative z-10 flex w-full max-w-sm flex-col gap-4 px-4">
         <div className="flex items-center gap-3">
-          <WarningOctagon weight="duotone" size={28} className="shrink-0 text-destructive" />
+          <WarningOctagonIcon weight="duotone" size={28} className="shrink-0 text-destructive" />
           <h1 className="font-heading text-base font-medium">{title}</h1>
         </div>
         <p className="text-xs/relaxed text-muted-foreground">{message}</p>

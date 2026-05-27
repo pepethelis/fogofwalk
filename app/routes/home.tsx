@@ -25,6 +25,7 @@ import {
   loadFogCache,
   clearFogCache,
   clearAll,
+  deleteTrack,
   isFogCacheValid,
 } from "~/lib/storage"
 import { clearMapPosition } from "~/lib/mapStore"
@@ -201,6 +202,41 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     return { intent: "clear-all" as const, trackCount: 0 }
   }
 
+  if (intent === "delete-track") {
+    const trackId = formData.get("trackId") as string
+
+    // Remove from in-memory store
+    mapStore.tracks = mapStore.tracks.filter((t) => t.id !== trackId)
+    mapStore.processedCount = 0
+
+    // Reset worker + update map sources immediately
+    mapStore.worker?.postMessage({ type: "RESET" })
+    const map = mapStore.map
+    if (map && mapStore.sourcesReady) {
+      ;(map.getSource("fog-source") as maplibregl.GeoJSONSource)?.setData(
+        worldFogGeoJSON()
+      )
+      ;(map.getSource("tracks-source") as maplibregl.GeoJSONSource)?.setData(
+        featureCollection([])
+      )
+    }
+
+    // Replay remaining tracks
+    if (mapStore.tracks.length > 0) {
+      mapStore.worker?.postMessage({
+        type: "PROCESS_TRACKS",
+        tracks: mapStore.tracks,
+        mode: mapStore.fogMode,
+      })
+    }
+
+    // Persist and invalidate fog cache
+    await deleteTrack(trackId)
+    await clearFogCache()
+
+    return { intent: "delete-track" as const, trackCount: mapStore.tracks.length }
+  }
+
   return null
 }
 
@@ -347,6 +383,17 @@ export default function Home() {
       setPhotos([])
       setSelectedGroup(null)
     }
+    if (data.intent === "delete-track") {
+      setSelectedTrackId(null)
+      setTrackCount(data.trackCount)
+      if (data.trackCount > 0) {
+        setIsProcessing(true)
+        setProcessedCount(0)
+      } else {
+        setIsProcessing(false)
+        setProcessedCount(0)
+      }
+    }
   }, [fetcher.data])
 
   function handleAddFiles(files: FileList, mode: FogMode = fogMode) {
@@ -369,6 +416,13 @@ export default function Home() {
     const formData = new FormData()
     formData.append("intent", "clear-all")
     fetcher.submit(formData, { method: "post" })
+  }
+
+  function handleDeleteTrack(trackId: string) {
+    const fd = new FormData()
+    fd.set("intent", "delete-track")
+    fd.set("trackId", trackId)
+    fetcher.submit(fd, { method: "post" })
   }
 
   async function handleAddPhotos(files: FileList) {
@@ -501,6 +555,7 @@ export default function Home() {
                 track={selectedTrack}
                 onClose={() => setSelectedTrackId(null)}
                 onShare={() => setShowShareDialog(true)}
+                onDelete={() => handleDeleteTrack(selectedTrack.id)}
               />
             </ErrorBoundary>
           )}

@@ -1,5 +1,5 @@
 import { Link, useLoaderData } from "react-router"
-import { Footprints } from "@phosphor-icons/react"
+import { FootprintsIcon } from "@phosphor-icons/react"
 import { PageShell } from "~/components/PageShell"
 import type { Route } from "./+types/stats"
 import { loadTracks } from "~/lib/storage"
@@ -59,7 +59,7 @@ export default function StatsPage() {
         {isEmpty ? (
           /* ── Empty state ── */
           <div className="flex flex-col items-center justify-center gap-3 rounded-none border border-dashed border-border py-24 text-center">
-            <Footprints size={40} className="text-muted-foreground" weight="duotone" />
+            <FootprintsIcon size={40} className="text-muted-foreground" weight="duotone" />
             <p className="text-sm text-muted-foreground">
               Import some tracks to see your stats.
             </p>

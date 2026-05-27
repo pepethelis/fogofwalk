@@ -117,6 +117,22 @@ export async function loadTracks(): Promise<ParsedTrack[]> {
   }
 }
 
+/** Delete a single track by id from storage. */
+export async function deleteTrack(id: string): Promise<void> {
+  const db = await getDb()
+  if (!db) return
+  try {
+    const tx = db.transaction("tracks", "readwrite")
+    tx.objectStore("tracks").delete(id)
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } catch (err) {
+    console.warn("[storage] deleteTrack failed:", err)
+  }
+}
+
 /** Delete all tracks from storage. */
 export async function clearTracks(): Promise<void> {
   const db = await getDb()
