@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useFetcher, useLoaderData } from "react-router"
+import { useFetcher, useLoaderData, useSearchParams } from "react-router"
 import type maplibregl from "maplibre-gl"
 import { featureCollection, lineString } from "@turf/helpers"
 import bbox from "@turf/bbox"
@@ -207,6 +207,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 export default function Home() {
   const loaderData = useLoaderData<typeof clientLoader>()
   const fetcher = useFetcher<typeof clientAction>()
+  const [searchParams] = useSearchParams()
 
   // Initialise from restored data (falls back to defaults on first load)
   const [trackCount, setTrackCount] = useState(loaderData.restoredTrackCount)
@@ -243,6 +244,21 @@ export default function Home() {
   useEffect(() => {
     if (mapReady && trackCount === 0) {
       setShowUploadDialog(true)
+    }
+  }, [mapReady])
+
+  // Select and zoom to a track when ?track=<id> is present in the URL
+  useEffect(() => {
+    if (!mapReady) return
+    const trackId = searchParams.get("track")
+    if (!trackId) return
+    setSelectedTrackId(trackId)
+    const track = mapStore.tracks.find((t) => t.id === trackId)
+    if (!track || !mapStore.map) return
+    const fc = featureCollection([lineString(track.coordinates)])
+    const [w, s, e, n] = bbox(fc)
+    if (isFinite(w)) {
+      mapStore.map.fitBounds([[w, s], [e, n]], { padding: 80, maxZoom: 14 })
     }
   }, [mapReady])
 

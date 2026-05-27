@@ -23,7 +23,7 @@ interface StatsLoaderData {
   totals: LifetimeTotals
   weekly: WeeklyBar[]
   streaks: Streaks
-  prs: PersonalRecords
+  records: PersonalRecords
 }
 
 export async function clientLoader(): Promise<StatsLoaderData> {
@@ -33,7 +33,7 @@ export async function clientLoader(): Promise<StatsLoaderData> {
     totals: computeLifetimeTotals(tracks),
     weekly: computeWeeklyBars(tracks),
     streaks: computeStreaks(tracks, now),
-    prs: computePersonalRecords(tracks),
+    records: computePersonalRecords(tracks),
   }
 }
 
@@ -47,7 +47,7 @@ export function meta({}: Route.MetaArgs) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  const { totals, weekly, streaks, prs } = useLoaderData<typeof clientLoader>()
+  const { totals, weekly, streaks, records } = useLoaderData<typeof clientLoader>()
   const isEmpty = totals.totalTracks === 0
 
   return (
@@ -83,7 +83,7 @@ export default function StatsPage() {
             <WeeklyChart weekly={weekly} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <StreaksCard streaks={streaks} />
-              <PersonalRecordsCard prs={prs} />
+              <PersonalRecordsCard records={records} />
             </div>
           </div>
         )}
