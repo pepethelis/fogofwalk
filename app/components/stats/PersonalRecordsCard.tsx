@@ -1,5 +1,5 @@
-import { Link } from "react-router"
 import type { PersonalRecords } from "~/lib/statsAggregator"
+import { AppLink } from "~/components/AppLink"
 import { formatElevation, formatPace, formatMovingTime } from "~/lib/statsFormatters"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card"
 import { Badge } from "~/components/ui/badge"
@@ -23,13 +23,13 @@ function RecordRow({ label, trackId, trackName, value, divider = false }: Record
     >
       <div className="min-w-0">
         <CardDescription>{label}</CardDescription>
-        <Link
+        <AppLink
           to={`/?track=${trackId}`}
-          className="mt-0.5 block truncate text-xs text-foreground underline-offset-2 hover:underline"
+          className="mt-0.5 block truncate"
           title={trackName}
         >
           {trackName}
-        </Link>
+        </AppLink>
       </div>
       <Badge variant="secondary" className="shrink-0 tabular-nums">
         {value}

@@ -1,5 +1,6 @@
 import { Link, useLoaderData } from "react-router"
-import { ArrowLeft, Footprints } from "@phosphor-icons/react"
+import { Footprints } from "@phosphor-icons/react"
+import { PageShell } from "~/components/PageShell"
 import type { Route } from "./+types/stats"
 import { loadTracks } from "~/lib/storage"
 import {
@@ -54,18 +55,7 @@ export default function StatsPage() {
   const isEmpty = totals.totalTracks === 0
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        {/* ── Header ── */}
-        <Link
-          to="/"
-          className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft size={16} />
-          Back to map
-        </Link>
-        <h1 className="mb-8 text-2xl font-bold tracking-tight">Your Stats</h1>
-
+    <PageShell title="Your Stats">
         {isEmpty ? (
           /* ── Empty state ── */
           <div className="flex flex-col items-center justify-center gap-3 rounded-none border border-dashed border-border py-24 text-center">
@@ -90,7 +80,6 @@ export default function StatsPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </PageShell>
   )
 }
