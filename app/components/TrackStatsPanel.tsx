@@ -30,7 +30,7 @@ function formatDuration(ms: number): string {
 function formatPace(minPerKm: number): string {
   const m = Math.floor(minPerKm)
   const s = Math.round((minPerKm - m) * 60)
-  return `${m}:${String(s).padStart(2, "0")} /km`
+  return `${m}:${String(s).padStart(2, "0")}/km`
 }
 
 function formatSpeed(kmh: number): string {
@@ -71,7 +71,11 @@ const EMPTY_STATS = {
   elevationProfile: [],
 } as const
 
-export function TrackStatsPanel({ track, onClose, onShare }: TrackStatsPanelProps) {
+export function TrackStatsPanel({
+  track,
+  onClose,
+  onShare,
+}: TrackStatsPanelProps) {
   // stats may be absent on tracks loaded before this field was added (HMR / future compat)
   const stats = track.stats ?? EMPTY_STATS
   const { style, onMouseDown } = useDraggable({
@@ -84,7 +88,7 @@ export function TrackStatsPanel({ track, onClose, onShare }: TrackStatsPanelProp
       <Card className="bg-background/80 backdrop-blur-md">
         <CardHeader
           onMouseDown={onMouseDown}
-          className="cursor-grab active:cursor-grabbing select-none"
+          className="cursor-grab select-none active:cursor-grabbing"
         >
           <CardTitle className="truncate">{track.name}</CardTitle>
           <CardAction>

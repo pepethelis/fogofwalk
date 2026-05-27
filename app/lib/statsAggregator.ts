@@ -1,0 +1,265 @@
+import type { ParsedTrack } from "~/types/tracks"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface LifetimeTotals {
+  totalDistanceKm: number
+  totalElevationGainM: number
+  totalMovingTimeMs: number
+  totalTracks: number
+  activeDays: number
+}
+
+export interface WeeklyBar {
+  /** ISO week label e.g. "2024-W03" */
+  week: string
+  /** Monday of that week in ms — used for x-axis labels */
+  startMs: number
+  distanceKm: number
+  trackCount: number
+}
+
+export interface Streaks {
+  currentStreakDays: number
+  longestStreakDays: number
+  /** "YYYY-MM-DD" strings for the last 84 days (12 weeks) that had activity */
+  recentDays: string[]
+  /** Total km in the current ISO week */
+  thisWeekKm: number
+  /** Total km in the previous ISO week */
+  lastWeekKm: number
+  /** Unique active days within the 84-day window */
+  activeInWindowCount: number
+}
+
+export interface PersonalRecords {
+  longestActivity: { track: ParsedTrack; distanceKm: number } | null
+  mostElevation: { track: ParsedTrack; elevationGainM: number } | null
+  fastestPace: { track: ParsedTrack; paceMinPerKm: number } | null
+  fastestSpeed: { track: ParsedTrack; speedKmh: number } | null
+  longestMovingTime: { track: ParsedTrack; movingTimeMs: number } | null
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Returns "YYYY-Www" (ISO 8601 week) for a given ms timestamp. */
+function toISOWeek(ms: number): string {
+  const d = new Date(ms)
+  // Copy the date so we don't mutate
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  // ISO weeks start on Monday; day 0 = Sunday in JS
+  const day = tmp.getUTCDay() || 7
+  // Thursday of the current week determines the year
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - day)
+  const year = tmp.getUTCFullYear()
+  const startOfYear = new Date(Date.UTC(year, 0, 1))
+  const week = Math.ceil(((tmp.getTime() - startOfYear.getTime()) / 86_400_000 + 1) / 7)
+  return `${year}-W${String(week).padStart(2, "0")}`
+}
+
+/** Returns the Monday of the ISO week that contains the given ms timestamp. */
+function mondayOfISOWeek(ms: number): number {
+  const d = new Date(ms)
+  const day = d.getUTCDay() || 7 // Mon=1 … Sun=7
+  const monday = new Date(ms)
+  monday.setUTCDate(d.getUTCDate() - (day - 1))
+  monday.setUTCHours(0, 0, 0, 0)
+  return monday.getTime()
+}
+
+/** Returns the local calendar date string "YYYY-MM-DD" for a ms timestamp. */
+function toLocalDateStr(ms: number): string {
+  const d = new Date(ms)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+// ─── Aggregators ──────────────────────────────────────────────────────────────
+
+export function computeLifetimeTotals(tracks: ParsedTrack[]): LifetimeTotals {
+  let totalDistanceKm = 0
+  let totalElevationGainM = 0
+  let totalMovingTimeMs = 0
+  const daySet = new Set<string>()
+
+  for (const t of tracks) {
+    totalDistanceKm += t.stats.distanceKm
+    totalElevationGainM += t.stats.elevationGainM
+    totalMovingTimeMs += t.stats.movingTimeMs ?? 0
+    if (t.startedAtMs != null) daySet.add(toLocalDateStr(t.startedAtMs))
+  }
+
+  return {
+    totalDistanceKm,
+    totalElevationGainM,
+    totalMovingTimeMs,
+    totalTracks: tracks.length,
+    activeDays: daySet.size,
+  }
+}
+
+export function computeWeeklyBars(tracks: ParsedTrack[]): WeeklyBar[] {
+  // Only dated tracks contribute to the chart
+  const dated = tracks.filter((t) => t.startedAtMs != null) as (ParsedTrack & {
+    startedAtMs: number
+  })[]
+  if (dated.length === 0) return []
+
+  // Accumulate per week
+  const weekMap = new Map<string, WeeklyBar>()
+  for (const t of dated) {
+    const week = toISOWeek(t.startedAtMs)
+    const existing = weekMap.get(week)
+    if (existing) {
+      existing.distanceKm += t.stats.distanceKm
+      existing.trackCount += 1
+    } else {
+      weekMap.set(week, {
+        week,
+        startMs: mondayOfISOWeek(t.startedAtMs),
+        distanceKm: t.stats.distanceKm,
+        trackCount: 1,
+      })
+    }
+  }
+
+  // Sort by startMs
+  const sorted = [...weekMap.values()].sort((a, b) => a.startMs - b.startMs)
+  if (sorted.length === 0) return []
+
+  // Fill in zero-distance weeks between first and last active week
+  const result: WeeklyBar[] = []
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
+  let cursor = sorted[0].startMs
+  const end = sorted[sorted.length - 1].startMs
+
+  const byStart = new Map(sorted.map((b) => [b.startMs, b]))
+
+  while (cursor <= end) {
+    const week = toISOWeek(cursor)
+    result.push(
+      byStart.get(cursor) ?? { week, startMs: cursor, distanceKm: 0, trackCount: 0 }
+    )
+    cursor += ONE_WEEK_MS
+  }
+
+  return result
+}
+
+export function computeStreaks(tracks: ParsedTrack[], todayMs: number): Streaks {
+  const dated = tracks.filter((t) => t.startedAtMs != null)
+  if (dated.length === 0) {
+    return {
+      currentStreakDays: 0,
+      longestStreakDays: 0,
+      recentDays: [],
+      thisWeekKm: 0,
+      lastWeekKm: 0,
+      activeInWindowCount: 0,
+    }
+  }
+
+  // Unique local calendar days, sorted ascending
+  const daySet = new Set(dated.map((t) => toLocalDateStr(t.startedAtMs!)))
+  const days = [...daySet].sort()
+
+  // Longest streak — single forward pass
+  let longestStreakDays = 1
+  let run = 1
+  for (let i = 1; i < days.length; i++) {
+    const prev = new Date(days[i - 1])
+    const curr = new Date(days[i])
+    const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86_400_000)
+    if (diffDays === 1) {
+      run++
+      longestStreakDays = Math.max(longestStreakDays, run)
+    } else {
+      run = 1
+    }
+  }
+
+  // Current streak — walk backward from today
+  const todayStr = toLocalDateStr(todayMs)
+  let currentStreakDays = 0
+  const daySetLookup = new Set(days)
+  let check = todayStr
+  while (daySetLookup.has(check)) {
+    currentStreakDays++
+    const d = new Date(check)
+    d.setDate(d.getDate() - 1)
+    check = toLocalDateStr(d.getTime())
+  }
+
+  // Collect active days within the last 84 days (12 weeks) for the activity grid
+  const cutoff = new Date(todayMs)
+  cutoff.setDate(cutoff.getDate() - 83)
+  const cutoffStr = toLocalDateStr(cutoff.getTime())
+  const recentDays = [...daySet].filter((d) => d >= cutoffStr)
+  const activeInWindowCount = recentDays.length
+
+  // This week vs last week km
+  const thisWeek = toISOWeek(todayMs)
+  const lastWeekMs = todayMs - 7 * 24 * 60 * 60 * 1000
+  const lastWeek = toISOWeek(lastWeekMs)
+  let thisWeekKm = 0
+  let lastWeekKm = 0
+  for (const t of dated) {
+    const w = toISOWeek(t.startedAtMs!)
+    if (w === thisWeek) thisWeekKm += t.stats.distanceKm
+    else if (w === lastWeek) lastWeekKm += t.stats.distanceKm
+  }
+
+  return { currentStreakDays, longestStreakDays, recentDays, thisWeekKm, lastWeekKm, activeInWindowCount }
+}
+
+export function computePersonalRecords(tracks: ParsedTrack[]): PersonalRecords {
+  if (tracks.length === 0) {
+    return { longestActivity: null, mostElevation: null, fastestPace: null, fastestSpeed: null, longestMovingTime: null }
+  }
+
+  let longestActivity: PersonalRecords["longestActivity"] = null
+  let mostElevation: PersonalRecords["mostElevation"] = null
+  let fastestPace: PersonalRecords["fastestPace"] = null
+  let fastestSpeed: PersonalRecords["fastestSpeed"] = null
+  let longestMovingTime: PersonalRecords["longestMovingTime"] = null
+
+  for (const t of tracks) {
+    const { distanceKm, elevationGainM, avgMovingPaceMinPerKm, avgMovingSpeedKmh, movingTimeMs } = t.stats
+
+    if (longestActivity == null || distanceKm > longestActivity.distanceKm) {
+      longestActivity = { track: t, distanceKm }
+    }
+
+    if (mostElevation == null || elevationGainM > mostElevation.elevationGainM) {
+      mostElevation = { track: t, elevationGainM }
+    }
+
+    if (
+      avgMovingPaceMinPerKm != null &&
+      avgMovingPaceMinPerKm > 0 &&
+      (fastestPace == null || avgMovingPaceMinPerKm < fastestPace.paceMinPerKm)
+    ) {
+      fastestPace = { track: t, paceMinPerKm: avgMovingPaceMinPerKm }
+    }
+
+    if (
+      avgMovingSpeedKmh != null &&
+      avgMovingSpeedKmh > 0 &&
+      (fastestSpeed == null || avgMovingSpeedKmh > fastestSpeed.speedKmh)
+    ) {
+      fastestSpeed = { track: t, speedKmh: avgMovingSpeedKmh }
+    }
+
+    if (
+      movingTimeMs != null &&
+      movingTimeMs > 0 &&
+      (longestMovingTime == null || movingTimeMs > longestMovingTime.movingTimeMs)
+    ) {
+      longestMovingTime = { track: t, movingTimeMs }
+    }
+  }
+
+  return { longestActivity, mostElevation, fastestPace, fastestSpeed, longestMovingTime }
+}

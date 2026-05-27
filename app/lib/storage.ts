@@ -102,7 +102,15 @@ export async function loadTracks(): Promise<ParsedTrack[]> {
   try {
     const tx = db.transaction("tracks", "readonly")
     const store = tx.objectStore("tracks")
-    return await promisifyRequest<ParsedTrack[]>(store.getAll())
+    const tracks = await promisifyRequest<ParsedTrack[]>(store.getAll())
+    // Read-time migration: populate startedAtMs for tracks saved before this field was added.
+    for (const track of tracks) {
+      if ((track as { startedAtMs?: unknown }).startedAtMs === undefined) {
+        const first = track.pointTimestamps?.find((t) => t != null && isFinite(t))
+        track.startedAtMs = first ?? null
+      }
+    }
+    return tracks
   } catch (err) {
     console.warn("[storage] loadTracks failed:", err)
     return []

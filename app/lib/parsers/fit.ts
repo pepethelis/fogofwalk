@@ -33,10 +33,12 @@ export async function parseFitFile(file: File): Promise<ParsedTrack[]> {
   const coords: TrackCoords = rawPoints.map((p) => [p.lng, p.lat])
   const ts = rawPoints.map((p) => p.timestampMs)
 
+  const validTs = ts.filter((t): t is number => t != null && isFinite(t))
   return [
     {
       id: crypto.randomUUID(),
       name: file.name,
+      startedAtMs: validTs.length > 0 ? validTs[0] : null,
       coordinates: coords,
       pointTimestamps: ts.every((t) => t == null) ? undefined : ts.map((t) => t ?? -1),
       format: "fit",

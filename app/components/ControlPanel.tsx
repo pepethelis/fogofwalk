@@ -10,6 +10,7 @@ import {
   Cloud,
   Image,
   Question,
+  ChartBar,
 } from "@phosphor-icons/react"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Badge } from "~/components/ui/badge"
@@ -238,6 +239,14 @@ export function ControlPanel({
               Clear all
             </Button>
           )}
+
+          <Link
+            to="/stats"
+            title="Statistics"
+            className={buttonVariants({ variant: "outline", size: "icon-sm" })}
+          >
+            <ChartBar weight="bold" size={16} />
+          </Link>
 
           <Link
             to="/help"

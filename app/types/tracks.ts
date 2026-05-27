@@ -22,6 +22,8 @@ export interface TrackStats {
 export interface ParsedTrack {
   id: string
   name: string
+  /** Ms timestamp of the first coordinate point. Null when the file has no timestamps. */
+  startedAtMs: number | null
   coordinates: TrackCoords
   pointTimestamps?: number[]
   format: "gpx" | "fit"

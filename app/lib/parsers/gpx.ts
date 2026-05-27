@@ -29,9 +29,11 @@ export async function parseGpxFile(file: File): Promise<ParsedTrack[]> {
           feat.properties?.coordinateProperties?.times
         const rawPoints = buildRawPoints(rawCoords, times)
         const ts = rawPoints.map((p) => p.timestampMs)
+        const validTs = ts.filter((t): t is number => t != null && isFinite(t))
         tracks.push({
           id: crypto.randomUUID(),
           name: file.name,
+          startedAtMs: validTs.length > 0 ? validTs[0] : null,
           coordinates: rawCoords.map((c) => [c[0], c[1]]) as TrackCoords,
           pointTimestamps: ts.every((t) => t == null) ? undefined : ts.map((t) => t ?? -1),
           format: "gpx",
@@ -46,9 +48,11 @@ export async function parseGpxFile(file: File): Promise<ParsedTrack[]> {
           const rawCoords = coords as [number, number, number?][]
           const rawPoints = buildRawPoints(rawCoords, allTimes?.[i])
           const ts = rawPoints.map((p) => p.timestampMs)
+          const validTs = ts.filter((t): t is number => t != null && isFinite(t))
           tracks.push({
             id: crypto.randomUUID(),
             name: `${file.name}[${i}]`,
+            startedAtMs: validTs.length > 0 ? validTs[0] : null,
             coordinates: rawCoords.map((c) => [c[0], c[1]]) as TrackCoords,
             pointTimestamps: ts.every((t) => t == null) ? undefined : ts.map((t) => t ?? -1),
             format: "gpx",

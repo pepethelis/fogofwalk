@@ -23,9 +23,23 @@ routes/home.tsx          clientLoader (creates worker, restores IDB state) + cli
   └─ TrackStatsPanel     right-side panel for selected track stats + elevation chart
   └─ PhotoCard           draggable panel showing photo viewer for a selected cluster
 
+routes/stats.tsx         clientLoader (loads IDB tracks, runs all aggregators) + StatsPage
+  └─ components/stats/
+       StatCards.tsx          8 lifetime metric cards (distance, elevation, activities, …)
+       WeeklyChart.tsx        Recharts BarChart of weekly km — uses --chart-1 color
+       StreaksCard.tsx        12-week activity grid + this-week/active/streak stats
+       ActivityGrid.tsx       GitHub-style 12×7 dot grid; active dots use --chart-1
+       PersonalRecordsCard.tsx  5 per-activity PRs (distance, elevation, pace, speed, time)
+
+routes/help.tsx          static help page
+
 lib/mapStore.ts          module-level singleton — map instance, worker ref, fog data, track list,
                          fogMode, initialCenter/Zoom (from localStorage), isRestoreReprocess flag
 lib/storage.ts           IndexedDB layer — tracks, photos (File objects), fog cache, fogMode pref
+lib/statsAggregator.ts   pure aggregation functions over ParsedTrack[]: computeLifetimeTotals,
+                         computeWeeklyBars, computeStreaks, computePersonalRecords
+lib/statsFormatters.ts   pure display formatters: formatKm, formatElevation, formatPace,
+                         formatMovingTime, formatXAxisTick, formatWeekRange
 workers/fogWorker.ts     ALL geometry: simplify → buffer → union/difference → emit fog polygon
 lib/parsers/
   index.ts               routes by extension
@@ -109,6 +123,40 @@ Photos do **not** need GPS/geotag data. Location is determined entirely by match
 **Photo objectUrls on restore**: `URL.createObjectURL()` is called in `loadPhotos()` for each restored photo File. These URLs are valid for the session. On clear-all, call `URL.revokeObjectURL()` for all photo entries before clearing state.
 
 **Loading overlay**: `home.tsx` renders a full-screen `#0a0a1e` div unconditionally from first render. It fades out via CSS transition when `mapReady` becomes true, then unmounts on `transitionend`. `body` has `bg-[#0a0a1e]` to prevent a white flash before React renders.
+
+**Explicit route registration**: Routes are NOT auto-discovered from the filesystem. Every route must be added to `app/routes.ts` or it will 404 and `react-router typegen` will not generate its `+types/` file.
+
+**`startedAtMs` read-time migration**: `loadTracks()` checks for the field being `undefined` (tracks saved before it was added) and back-fills it from `pointTimestamps[0]`. The fix is applied in memory only — no re-save — so old IDB data stays untouched.
+
+## Stats page
+
+`/stats` is a separate full-page route (registered in `app/routes.ts`). It is entirely
+client-side — `clientLoader` calls `loadTracks()` then runs the four aggregators.
+
+### Aggregators (`lib/statsAggregator.ts`)
+
+| Function | Output |
+|---|---|
+| `computeLifetimeTotals` | Distance, elevation, moving time, track count, active days |
+| `computeWeeklyBars` | One `WeeklyBar` per ISO week between first and last activity; gaps filled with zero |
+| `computeStreaks` | Current/longest streak, 84-day active-day set, this-week/last-week km, active-day count |
+| `computePersonalRecords` | Best single-activity records: distance, elevation, pace, speed, moving time |
+
+`computeStreaks` uses **local calendar dates** (not UTC) so days match what the user sees on their device.
+
+### Chart colors
+
+`--chart-1` through `--chart-5` in `app/app.css` are a vivid oklch palette (blue, teal,
+amber, violet, rose). Both `WeeklyChart` bars and `ActivityGrid` active dots use
+`--chart-1`. Add more series by using `--chart-2` … `--chart-5`.
+
+### `startedAtMs` field
+
+`ParsedTrack.startedAtMs: number | null` is the ms timestamp of the first coordinate point.
+It is populated by both parsers. Tracks saved to IDB before this field existed are
+**migrated at read time** in `loadTracks()` (derives value from `pointTimestamps[0]`,
+no re-save needed). Any new consumer of temporal data should use `startedAtMs` — do not
+re-derive from `pointTimestamps` elsewhere.
 
 ## File format support
 
