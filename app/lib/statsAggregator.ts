@@ -1,4 +1,8 @@
 import type { ParsedTrack } from "~/types/tracks"
+import { haversineKm } from "~/lib/stats"
+
+// Grid resolution: 0.001° ≈ 111 m per cell, matching FOG_CLEAR_RADIUS_METERS = 100 m
+const GRID_SCALE = 1000
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -262,4 +266,65 @@ export function computePersonalRecords(tracks: ParsedTrack[]): PersonalRecords {
   }
 
   return { longestActivity, mostElevation, fastestPace, fastestSpeed, longestMovingTime }
+}
+
+/**
+ * Total km traveled on ground not previously covered by any earlier track.
+ *
+ * Uses a grid-based midpoint check (~100 m cells) for O(n_segments) performance —
+ * no polygon math, safe for 1000+ tracks. Tracks are processed chronologically
+ * (null-timestamp tracks go last) so "new ground" has a deterministic meaning.
+ *
+ * Two passes per track:
+ *   1. Count all segments whose midpoint cell is NOT in explored (= previous tracks' coverage).
+ *   2. Mark this track's 3×3 neighbourhood into explored.
+ *
+ * Splitting check and mark into separate passes is critical: marking immediately
+ * after each segment (in a single pass) causes the very next GPS point (~5 m away)
+ * to land in an already-marked neighbour cell and be silently dropped, collapsing
+ * the entire track's unique distance to nearly zero.
+ */
+export function computeUniqueDistance(tracks: ParsedTrack[]): number {
+  const sorted = [...tracks].sort((a, b) => {
+    if (a.startedAtMs == null && b.startedAtMs == null) return 0
+    if (a.startedAtMs == null) return 1
+    if (b.startedAtMs == null) return -1
+    return a.startedAtMs - b.startedAtMs
+  })
+
+  const explored = new Set<string>()
+  let uniqueKm = 0
+
+  for (const track of sorted) {
+    const coords = track.coordinates
+
+    // Pass 1: count segments on new ground (vs. all previously processed tracks)
+    for (let i = 1; i < coords.length; i++) {
+      const [lng1, lat1] = coords[i - 1]
+      const [lng2, lat2] = coords[i]
+      const cx = Math.round(((lng1 + lng2) / 2) * GRID_SCALE)
+      const cy = Math.round(((lat1 + lat2) / 2) * GRID_SCALE)
+
+      if (!explored.has(`${cx},${cy}`)) {
+        uniqueKm += haversineKm(lng1, lat1, lng2, lat2)
+      }
+    }
+
+    // Pass 2: mark this track's buffer as explored so later tracks can check against it
+    for (let i = 1; i < coords.length; i++) {
+      const [lng1, lat1] = coords[i - 1]
+      const [lng2, lat2] = coords[i]
+      const cx = Math.round(((lng1 + lng2) / 2) * GRID_SCALE)
+      const cy = Math.round(((lat1 + lat2) / 2) * GRID_SCALE)
+
+      // 3×3 neighbourhood approximates the 100 m fog-clear buffer
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          explored.add(`${cx + dx},${cy + dy}`)
+        }
+      }
+    }
+  }
+
+  return uniqueKm
 }

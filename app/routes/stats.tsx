@@ -7,6 +7,7 @@ import {
   computeWeeklyBars,
   computeStreaks,
   computePersonalRecords,
+  computeUniqueDistance,
   type LifetimeTotals,
   type WeeklyBar,
   type Streaks,
@@ -24,6 +25,7 @@ interface StatsLoaderData {
   weekly: WeeklyBar[]
   streaks: Streaks
   records: PersonalRecords
+  uniqueDistanceKm: number
 }
 
 export async function clientLoader(): Promise<StatsLoaderData> {
@@ -34,6 +36,7 @@ export async function clientLoader(): Promise<StatsLoaderData> {
     weekly: computeWeeklyBars(tracks),
     streaks: computeStreaks(tracks, now),
     records: computePersonalRecords(tracks),
+    uniqueDistanceKm: computeUniqueDistance(tracks),
   }
 }
 
@@ -47,7 +50,7 @@ export function meta({}: Route.MetaArgs) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  const { totals, weekly, streaks, records } = useLoaderData<typeof clientLoader>()
+  const { totals, weekly, streaks, records, uniqueDistanceKm } = useLoaderData<typeof clientLoader>()
   const isEmpty = totals.totalTracks === 0
 
   return (
@@ -79,7 +82,7 @@ export default function StatsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <StatCards totals={totals} longestStreakDays={streaks.longestStreakDays} />
+            <StatCards totals={totals} uniqueDistanceKm={uniqueDistanceKm} />
             <WeeklyChart weekly={weekly} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <StreaksCard streaks={streaks} />

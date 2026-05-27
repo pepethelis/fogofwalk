@@ -14,7 +14,7 @@ export interface RawPoint {
 const EARTH_RADIUS_KM = 6371.0088
 const MAX_PROFILE_POINTS = 300
 
-function haversineKm(
+export function haversineKm(
   lng1: number,
   lat1: number,
   lng2: number,

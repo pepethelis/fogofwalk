@@ -1,13 +1,22 @@
 import type { LifetimeTotals } from "~/lib/statsAggregator"
-import { formatKm, formatElevation, formatMovingTime } from "~/lib/statsFormatters"
-import { Card, CardHeader, CardDescription, CardTitle } from "~/components/ui/card"
+import {
+  formatKm,
+  formatElevation,
+  formatMovingTime,
+} from "~/lib/statsFormatters"
+import {
+  Card,
+  CardHeader,
+  CardDescription,
+  CardTitle,
+} from "~/components/ui/card"
 
 interface StatCardsProps {
   totals: LifetimeTotals
-  longestStreakDays: number
+  uniqueDistanceKm: number
 }
 
-export function StatCards({ totals, longestStreakDays }: StatCardsProps) {
+export function StatCards({ totals, uniqueDistanceKm }: StatCardsProps) {
   const avgDistanceKm =
     totals.totalTracks > 0 ? totals.totalDistanceKm / totals.totalTracks : 0
   const avgElevationM =
@@ -20,6 +29,26 @@ export function StatCards({ totals, longestStreakDays }: StatCardsProps) {
           <CardDescription>Distance</CardDescription>
           <CardTitle className="text-2xl tabular-nums">
             {formatKm(totals.totalDistanceKm)}
+          </CardTitle>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardDescription>Unique distance</CardDescription>
+          <CardTitle className="text-2xl tabular-nums">
+            {formatKm(uniqueDistanceKm)}
+          </CardTitle>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardDescription>Moving time</CardDescription>
+          <CardTitle className="text-2xl tabular-nums">
+            {totals.totalMovingTimeMs > 0
+              ? formatMovingTime(totals.totalMovingTimeMs)
+              : "—"}
           </CardTitle>
         </CardHeader>
       </Card>
@@ -53,17 +82,6 @@ export function StatCards({ totals, longestStreakDays }: StatCardsProps) {
 
       <Card>
         <CardHeader>
-          <CardDescription>Moving time</CardDescription>
-          <CardTitle className="text-2xl tabular-nums">
-            {totals.totalMovingTimeMs > 0
-              ? formatMovingTime(totals.totalMovingTimeMs)
-              : "—"}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardDescription>Avg distance</CardDescription>
           <CardTitle className="text-2xl tabular-nums">
             {formatKm(avgDistanceKm)}
@@ -76,18 +94,6 @@ export function StatCards({ totals, longestStreakDays }: StatCardsProps) {
           <CardDescription>Avg elevation gain</CardDescription>
           <CardTitle className="text-2xl tabular-nums">
             {formatElevation(avgElevationM)}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardDescription>Longest streak</CardDescription>
-          <CardTitle className="text-2xl tabular-nums">
-            {longestStreakDays}
-            <span className="ml-1 text-sm font-normal">
-              day{longestStreakDays !== 1 ? "s" : ""}
-            </span>
           </CardTitle>
         </CardHeader>
       </Card>
