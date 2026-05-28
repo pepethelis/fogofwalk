@@ -134,7 +134,7 @@ Both exports are browser-side downloads with no backend required.
 
 ---
 
-## 9. Copy Track Name Button — LOW EFFORT (QUICK WIN)
+## 9. ~~Copy Track Name Button~~ — ✅ DONE
 
 Track names can be long and are truncated in the `CardTitle`. A copy button lets users grab the
 full name without scrolling or inspecting.

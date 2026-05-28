@@ -1,5 +1,12 @@
 import { useState } from "react"
-import { XIcon, ShareNetworkIcon, TrashIcon } from "@phosphor-icons/react"
+import {
+  XIcon,
+  ShareNetworkIcon,
+  TrashIcon,
+  CopyIcon,
+  CheckIcon,
+} from "@phosphor-icons/react"
+import { useCopyToClipboard } from "~/lib/useCopyToClipboard"
 import type { ParsedTrack } from "~/types/tracks"
 import {
   Card,
@@ -91,7 +98,8 @@ export function TrackStatsPanel({
 }: TrackStatsPanelProps) {
   // stats may be absent on tracks loaded before this field was added (HMR / future compat)
   const stats = track.stats ?? EMPTY_STATS
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isNameCopied, copyName] = useCopyToClipboard()
   const { style, onMouseDown } = useDraggable({
     x: typeof window !== "undefined" ? window.innerWidth - 336 : 0,
     y: 16,
@@ -106,6 +114,18 @@ export function TrackStatsPanel({
         >
           <CardTitle className="truncate">{track.name}</CardTitle>
           <CardAction>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => copyName(track.name)}
+              aria-label="Copy track name"
+            >
+              {isNameCopied ? (
+                <CheckIcon weight="bold" />
+              ) : (
+                <CopyIcon weight="duotone" />
+              )}
+            </Button>
             {onShare && (
               <Button
                 variant="ghost"
@@ -120,7 +140,7 @@ export function TrackStatsPanel({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={() => setDeleteOpen(true)}
+                onClick={() => setIsDeleteOpen(true)}
                 aria-label="Delete track"
               >
                 <TrashIcon weight="duotone" />
@@ -203,7 +223,7 @@ export function TrackStatsPanel({
         </CardContent>
       </Card>
       {onDelete && (
-        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
           <DialogContent showCloseButton={false}>
             <DialogHeader>
               <DialogTitle>Delete this track?</DialogTitle>
@@ -213,13 +233,13 @@ export function TrackStatsPanel({
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
                 Cancel
               </Button>
               <Button
                 variant="destructive"
                 onClick={() => {
-                  setDeleteOpen(false)
+                  setIsDeleteOpen(false)
                   onDelete()
                 }}
               >

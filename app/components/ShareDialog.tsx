@@ -65,7 +65,7 @@ export function ShareDialog({
   )
   const [isExporting, setIsExporting] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const previewRef = useRef<HTMLCanvasElement>(null)
@@ -171,8 +171,8 @@ export function ShareDialog({
         blurAmount,
         enabledStats,
       })
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
     } catch (err) {
       // Clipboard API unavailable (non-HTTPS, Firefox without permission, etc.)
       const msg = err instanceof Error ? err.message : "Copy failed"
@@ -366,7 +366,7 @@ export function ShareDialog({
             disabled={isCopying || isExporting}
           >
             <CopyIcon weight="bold" />
-            {copied ? "Copied!" : isCopying ? "Copying…" : "Copy PNG"}
+            {isCopied ? "Copied!" : isCopying ? "Copying…" : "Copy PNG"}
           </Button>
           <Button size="sm" onClick={handleExport} disabled={isExporting || isCopying}>
             <DownloadSimpleIcon weight="bold" />
