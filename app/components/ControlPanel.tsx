@@ -22,6 +22,7 @@ import type { FogMode, MapMode } from "~/types/tracks"
 import { Card, CardContent } from "./ui/card"
 import { MoreDrawer } from "~/components/MoreDrawer"
 import { useIsMobile } from "~/lib/useIsMobile"
+import { ClearAllDialog } from "~/components/ClearAllDialog"
 
 interface ControlPanelProps {
   trackCount: number
@@ -67,6 +68,7 @@ export function ControlPanel({
   const isMobile = useIsMobile()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const [isClearAllOpen, setIsClearAllOpen] = useState(false)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
@@ -278,7 +280,7 @@ export function ControlPanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={onClearAll}
+                onClick={() => setIsClearAllOpen(true)}
                 disabled={isProcessing || trackCount === 0}
               >
                 <TrashIcon weight="bold" className="mr-1.5" />
@@ -386,10 +388,18 @@ export function ControlPanel({
             processedCount={processedCount}
             showAddPhotosOption={showAddPhotosOption}
             onAddPhotos={() => photoInputRef.current?.click()}
-            onClearAll={onClearAll}
+            onClearAll={() => setIsClearAllOpen(true)}
           />
         </>
       )}
+
+      <ClearAllDialog
+        open={isClearAllOpen}
+        onOpenChange={setIsClearAllOpen}
+        trackCount={trackCount}
+        photoCount={photoCount}
+        onConfirm={onClearAll}
+      />
     </>
   )
 }

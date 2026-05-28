@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link } from "react-router"
 import {
   ImageIcon,
@@ -8,6 +9,7 @@ import {
 } from "@phosphor-icons/react"
 import { Drawer, DrawerContent } from "~/components/ui/drawer"
 import { Item, ItemContent, ItemMedia, ItemTitle } from "~/components/ui/item"
+import { ClearAllDialog } from "~/components/ClearAllDialog"
 
 interface MoreDrawerProps {
   isOpen: boolean
@@ -33,8 +35,10 @@ export function MoreDrawer({
   onClearAll,
 }: MoreDrawerProps) {
   const close = () => onOpenChange(false)
+  const [isClearAllOpen, setIsClearAllOpen] = useState(false)
 
   return (
+    <>
     <Drawer open={isOpen} onOpenChange={onOpenChange}>
       <DrawerContent>
         <div className="flex flex-col gap-3 px-4 pt-2 pb-8">
@@ -72,7 +76,7 @@ export function MoreDrawer({
                   render={<button type="button" disabled={isProcessing} />}
                   onClick={() => {
                     close()
-                    setTimeout(onClearAll, 150)
+                    setTimeout(() => setIsClearAllOpen(true), 300)
                   }}
                   className="text-destructive active:brightness-95 disabled:opacity-40"
                 >
@@ -135,5 +139,14 @@ export function MoreDrawer({
         </div>
       </DrawerContent>
     </Drawer>
+
+    <ClearAllDialog
+      open={isClearAllOpen}
+      onOpenChange={setIsClearAllOpen}
+      trackCount={trackCount}
+      photoCount={photoCount}
+      onConfirm={onClearAll}
+    />
+    </>
   )
 }
