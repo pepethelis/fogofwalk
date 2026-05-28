@@ -80,6 +80,23 @@ function toLocalDateStr(ms: number): string {
   return `${y}-${m}-${day}`
 }
 
+// ─── Sort helper ──────────────────────────────────────────────────────────────
+
+/**
+ * Returns a new array of tracks sorted chronologically by startedAtMs.
+ * Tracks without a timestamp are placed last.
+ * Call this once at the data boundary (clientLoader / clientAction) so that
+ * aggregators can iterate in order without re-sorting on every call.
+ */
+export function sortTracks(tracks: ParsedTrack[]): ParsedTrack[] {
+  return [...tracks].sort((a, b) => {
+    if (a.startedAtMs == null && b.startedAtMs == null) return 0
+    if (a.startedAtMs == null) return 1
+    if (b.startedAtMs == null) return -1
+    return a.startedAtMs - b.startedAtMs
+  })
+}
+
 // ─── Aggregators ──────────────────────────────────────────────────────────────
 
 export function computeLifetimeTotals(tracks: ParsedTrack[]): LifetimeTotals {
@@ -269,11 +286,13 @@ export function computePersonalRecords(tracks: ParsedTrack[]): PersonalRecords {
 }
 
 /**
- * Total km traveled on ground not previously covered by any earlier track.
+ * Returns a Map from track id → km of new ground covered by that track.
  *
  * Uses a grid-based midpoint check (~100 m cells) for O(n_segments) performance —
- * no polygon math, safe for 1000+ tracks. Tracks are processed chronologically
- * (null-timestamp tracks go last) so "new ground" has a deterministic meaning.
+ * no polygon math, safe for 1000+ tracks.
+ *
+ * **Tracks must be pre-sorted chronologically** (call `sortTracks` first) so that
+ * "new ground" has a deterministic meaning — earlier tracks claim ground first.
  *
  * Two passes per track:
  *   1. Count all segments whose midpoint cell is NOT in explored (= previous tracks' coverage).
@@ -284,18 +303,14 @@ export function computePersonalRecords(tracks: ParsedTrack[]): PersonalRecords {
  * to land in an already-marked neighbour cell and be silently dropped, collapsing
  * the entire track's unique distance to nearly zero.
  */
-export function computeUniqueDistance(tracks: ParsedTrack[]): number {
-  const sorted = [...tracks].sort((a, b) => {
-    if (a.startedAtMs == null && b.startedAtMs == null) return 0
-    if (a.startedAtMs == null) return 1
-    if (b.startedAtMs == null) return -1
-    return a.startedAtMs - b.startedAtMs
-  })
-
+export function computePerTrackUniqueDistances(
+  tracks: ParsedTrack[],
+): Map<string, number> {
   const explored = new Set<string>()
-  let uniqueKm = 0
+  const result = new Map<string, number>()
 
-  for (const track of sorted) {
+  for (const track of tracks) {
+    let trackUniqueKm = 0
     const coords = track.coordinates
 
     // Pass 1: count segments on new ground (vs. all previously processed tracks)
@@ -306,7 +321,7 @@ export function computeUniqueDistance(tracks: ParsedTrack[]): number {
       const cy = Math.round(((lat1 + lat2) / 2) * GRID_SCALE)
 
       if (!explored.has(`${cx},${cy}`)) {
-        uniqueKm += haversineKm(lng1, lat1, lng2, lat2)
+        trackUniqueKm += haversineKm(lng1, lat1, lng2, lat2)
       }
     }
 
@@ -324,7 +339,20 @@ export function computeUniqueDistance(tracks: ParsedTrack[]): number {
         }
       }
     }
+
+    result.set(track.id, trackUniqueKm)
   }
 
-  return uniqueKm
+  return result
+}
+
+/**
+ * Total km traveled on ground not previously covered by any earlier track.
+ * Thin wrapper around `computePerTrackUniqueDistances` — kept for the Stats page.
+ * Tracks must be pre-sorted (call `sortTracks` first).
+ */
+export function computeUniqueDistance(tracks: ParsedTrack[]): number {
+  let total = 0
+  for (const km of computePerTrackUniqueDistances(tracks).values()) total += km
+  return total
 }

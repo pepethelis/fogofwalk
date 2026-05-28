@@ -4,6 +4,7 @@ import { PageShell } from "~/components/PageShell"
 import type { Route } from "./+types/stats"
 import { loadTracks } from "~/lib/storage"
 import {
+  sortTracks,
   computeLifetimeTotals,
   computeWeeklyBars,
   computeStreaks,
@@ -30,7 +31,7 @@ interface StatsLoaderData {
 }
 
 export async function clientLoader(): Promise<StatsLoaderData> {
-  const tracks = await loadTracks()
+  const tracks = sortTracks(await loadTracks())
   const now = Date.now()
   return {
     totals: computeLifetimeTotals(tracks),

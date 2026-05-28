@@ -22,6 +22,7 @@ import { useDraggable } from "~/lib/useDraggable"
 
 interface TrackStatsPanelProps {
   track: ParsedTrack
+  uniqueKm?: number
   onClose: () => void
   onShare?: () => void
   onDelete?: () => void
@@ -83,6 +84,7 @@ const EMPTY_STATS = {
 
 export function TrackStatsPanel({
   track,
+  uniqueKm,
   onClose,
   onShare,
   onDelete,
@@ -140,6 +142,12 @@ export function TrackStatsPanel({
               label="Distance"
               value={formatDistance(stats.distanceKm)}
             />
+            {uniqueKm != null && stats.distanceKm > 0 && (
+              <StatRow
+                label="Unique distance"
+                value={`${formatDistance(uniqueKm)} (${Math.round((uniqueKm / stats.distanceKm) * 100)}%)`}
+              />
+            )}
             {stats.durationMs != null && (
               <StatRow
                 label="Duration"

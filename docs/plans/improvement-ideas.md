@@ -52,7 +52,7 @@ fix this.
 
 ## 3. Unique Distance Tracking (Wandrer-inspired) — MEDIUM COMPLEXITY
 
-On each file import, measure how much of the new track was *new ground* vs. already explored.
+On each file import, measure how much of the new track was *unique distance* vs. already explored.
 
 **How it works**
 - After fog computation, clip the new track's buffer against the existing fog polygon using
@@ -61,7 +61,7 @@ On each file import, measure how much of the new track was *new ground* vs. alre
 - Store `uniqueKm` per track alongside `distanceKm` in `ParsedTrack`
 
 **Where it shows**
-- Track stats panel: "New ground: X km (Y%)"
+- Track stats panel: "Unique distance: X km (Y%)"
 - Stats dashboard: lifetime unique km
 
 > Note: this is conceptually the inverse of fog computation — instead of carving the fog polygon,
