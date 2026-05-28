@@ -247,7 +247,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 export default function Home() {
   const loaderData = useLoaderData<typeof clientLoader>()
   const fetcher = useFetcher<typeof clientAction>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Initialise from restored data (falls back to defaults on first load)
   const [trackCount, setTrackCount] = useState(loaderData.restoredTrackCount)
@@ -305,6 +305,35 @@ export default function Home() {
     if (isFinite(w)) {
       mapStore.map.fitBounds([[w, s], [e, n]], { padding: 80, maxZoom: 14 })
     }
+  }, [mapReady])
+
+  // Handle files shared via the Web Share Target API (PWA installed).
+  // The service worker intercepts the POST to /?share-target, buffers the files
+  // in Cache Storage, then redirects to /?from-share. We drain the queue here.
+  useEffect(() => {
+    if (!mapReady || !searchParams.has("from-share")) return
+    ;(async () => {
+      if (!("caches" in window)) return
+      const cache = await caches.open("share-target-queue")
+      const keys = await cache.keys()
+      if (keys.length === 0) return
+      const files: File[] = []
+      for (const req of keys) {
+        const res = await cache.match(req)
+        if (!res) continue
+        const name = res.headers.get("X-File-Name") ?? "file"
+        const type = res.headers.get("Content-Type") ?? ""
+        files.push(new File([await res.arrayBuffer()], name, { type }))
+        await cache.delete(req)
+      }
+      if (files.length > 0) {
+        const dt = new DataTransfer()
+        files.forEach((f) => dt.items.add(f))
+        handleAddFiles(dt.files)
+      }
+      // Clean the URL so a page refresh doesn't re-trigger this effect
+      setSearchParams({}, { replace: true })
+    })()
   }, [mapReady])
 
   // Trigger worker reprocessing when fog cache was stale
@@ -566,7 +595,17 @@ export default function Home() {
               <TrackStatsPanel
                 track={selectedTrack}
                 uniqueKm={perTrackUniqueKm.get(selectedTrack.id)}
-                onClose={() => setSelectedTrackId(null)}
+                onClose={() => {
+                  setSelectedTrackId(null)
+                  setSearchParams(
+                    (prev) => {
+                      const next = new URLSearchParams(prev)
+                      next.delete("track")
+                      return next
+                    },
+                    { replace: true }
+                  )
+                }}
                 onShare={() => setShowShareDialog(true)}
                 onDelete={() => handleDeleteTrack(selectedTrack.id)}
               />

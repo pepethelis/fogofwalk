@@ -37,47 +37,50 @@ export function ActivityGrid({ recentDays }: ActivityGridProps) {
         From <span>{startLabel}</span> to <span>{todayLabel}</span>
       </div>
 
-      <div
-        className="flex gap-0.5"
-        aria-label="Activity over the last 12 weeks"
-      >
-        {/* Day-of-week label column */}
-        <div className="mr-0.5 flex flex-col gap-0.5">
-          {DOW_LABELS.map((label, i) => (
-            <span
-              key={i}
-              className="flex size-3 items-center justify-end text-sm leading-none text-muted-foreground"
-            >
-              {label}
-            </span>
+      {/* Horizontally scrollable wrapper for narrow screens */}
+      <div className="overflow-x-auto -mx-4 px-4">
+        <div
+          className="flex gap-0.5 min-w-max"
+          aria-label="Activity over the last 12 weeks"
+        >
+          {/* Day-of-week label column */}
+          <div className="mr-0.5 flex flex-col gap-0.5">
+            {DOW_LABELS.map((label, i) => (
+              <span
+                key={i}
+                className="flex size-3.5 items-center justify-end text-sm leading-none text-muted-foreground sm:size-3"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+
+          {/* 12 week columns */}
+          {Array.from({ length: 12 }, (_, week) => (
+            <div key={week} className="flex flex-col gap-0.5">
+              {Array.from({ length: 7 }, (_, day) => {
+                const d = new Date(startDate)
+                d.setDate(startDate.getDate() + week * 7 + day)
+                const dateStr = toDateStr(d)
+                const isActive = activeDaySet.has(dateStr)
+                const isFuture = d > today
+                return (
+                  <div
+                    key={day}
+                    title={dateStr}
+                    className={
+                      isFuture
+                        ? "invisible h-3.5 w-6 sm:h-3 sm:w-5"
+                        : isActive
+                          ? "h-3.5 w-6 rounded-xs bg-[var(--chart-1)] sm:h-3 sm:w-5"
+                          : "h-3.5 w-6 rounded-xs bg-muted sm:h-3 sm:w-5"
+                    }
+                  />
+                )
+              })}
+            </div>
           ))}
         </div>
-
-        {/* 12 week columns */}
-        {Array.from({ length: 12 }, (_, week) => (
-          <div key={week} className="flex flex-col gap-0.5">
-            {Array.from({ length: 7 }, (_, day) => {
-              const d = new Date(startDate)
-              d.setDate(startDate.getDate() + week * 7 + day)
-              const dateStr = toDateStr(d)
-              const isActive = activeDaySet.has(dateStr)
-              const isFuture = d > today
-              return (
-                <div
-                  key={day}
-                  title={dateStr}
-                  className={
-                    isFuture
-                      ? "invisible h-3 w-5"
-                      : isActive
-                        ? "h-3 w-5 rounded-xs bg-[var(--chart-1)]"
-                        : "h-3 w-5 rounded-xs bg-muted"
-                  }
-                />
-              )
-            })}
-          </div>
-        ))}
       </div>
     </div>
   )

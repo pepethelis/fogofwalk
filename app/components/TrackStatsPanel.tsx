@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import {
   XIcon,
   ShareNetworkIcon,
@@ -24,8 +24,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from "~/components/ui/dialog"
+import {
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetHeader,
+  BottomSheetTitle,
+} from "~/components/ui/bottom-sheet"
 import { ElevationChart } from "~/components/ElevationChart"
 import { useDraggable } from "~/lib/useDraggable"
+import { useIsMobile } from "~/lib/useIsMobile"
 
 interface TrackStatsPanelProps {
   track: ParsedTrack
@@ -100,155 +107,202 @@ export function TrackStatsPanel({
   const stats = track.stats ?? EMPTY_STATS
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isNameCopied, copyName] = useCopyToClipboard()
-  const { style, onMouseDown } = useDraggable({
+  // Local open state so the exit animation plays before the parent unmounts
+  const [isOpen, setIsOpen] = useState(true)
+  const isDismissingRef = useRef(false)
+  const isMobile = useIsMobile()
+  const { style, onMouseDown, onTouchStart } = useDraggable({
     x: typeof window !== "undefined" ? window.innerWidth - 336 : 0,
     y: 16,
   })
+
+  // On mobile: set open=false so the sheet exit animation plays, then call onClose
+  // On desktop: close immediately (no sheet, no animation needed)
+  function handleDismiss() {
+    if (isDismissingRef.current) return
+    isDismissingRef.current = true
+    if (isMobile) {
+      setIsOpen(false)
+      setTimeout(onClose, 200)
+    } else {
+      onClose()
+    }
+  }
+
+  const actionButtons = (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => copyName(track.name)}
+        aria-label="Copy track name"
+      >
+        {isNameCopied ? (
+          <CheckIcon weight="bold" />
+        ) : (
+          <CopyIcon weight="duotone" />
+        )}
+      </Button>
+      {onShare && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onShare}
+          aria-label="Share"
+        >
+          <ShareNetworkIcon weight="duotone" />
+        </Button>
+      )}
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setIsDeleteOpen(true)}
+          aria-label="Delete track"
+        >
+          <TrashIcon weight="duotone" />
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={handleDismiss}
+        aria-label="Close"
+        className="hidden sm:inline-flex"
+      >
+        <XIcon weight="bold" />
+      </Button>
+    </>
+  )
+
+  const statsContent = (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <StatRow label="Distance" value={formatDistance(stats.distanceKm)} />
+        {uniqueKm != null && stats.distanceKm > 0 && (
+          <StatRow
+            label="Unique distance"
+            value={`${formatDistance(uniqueKm)} (${Math.round((uniqueKm / stats.distanceKm) * 100)}%)`}
+          />
+        )}
+        {stats.durationMs != null && (
+          <StatRow label="Duration" value={formatDuration(stats.durationMs)} />
+        )}
+        {stats.movingTimeMs != null && (
+          <StatRow
+            label="Moving time"
+            value={formatDuration(stats.movingTimeMs)}
+          />
+        )}
+        {stats.avgPaceMinPerKm != null && (
+          <StatRow label="Avg pace" value={formatPace(stats.avgPaceMinPerKm)} />
+        )}
+        {stats.avgMovingPaceMinPerKm != null && (
+          <StatRow
+            label="Avg moving pace"
+            value={formatPace(stats.avgMovingPaceMinPerKm)}
+          />
+        )}
+        {stats.avgSpeedKmh != null && (
+          <StatRow label="Avg speed" value={formatSpeed(stats.avgSpeedKmh)} />
+        )}
+        {stats.avgMovingSpeedKmh != null && (
+          <StatRow
+            label="Avg moving speed"
+            value={formatSpeed(stats.avgMovingSpeedKmh)}
+          />
+        )}
+        {stats.hasElevation && (
+          <>
+            <StatRow
+              label="Elevation ↑"
+              value={formatElevation(stats.elevationGainM)}
+            />
+            <StatRow
+              label="Elevation ↓"
+              value={formatElevation(stats.elevationLossM)}
+            />
+          </>
+        )}
+      </div>
+      {stats.hasElevation && stats.elevationProfile.length >= 2 && (
+        <ElevationChart profile={stats.elevationProfile} />
+      )}
+    </div>
+  )
+
+  const deleteDialog = onDelete && (
+    <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Delete this track?</DialogTitle>
+          <DialogDescription>
+            &ldquo;{track.name}&rdquo; will be removed and the fog map will be
+            recalculated. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setIsDeleteOpen(false)
+              onDelete()
+            }}
+          >
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  if (isMobile) {
+    return (
+      <>
+        <BottomSheet
+          open={isOpen}
+          onOpenChange={(open) => {
+            if (!open) handleDismiss()
+          }}
+        >
+          <BottomSheetContent onClose={handleDismiss}>
+            <BottomSheetHeader>
+              <div className="flex items-center justify-between gap-2">
+                <BottomSheetTitle className="truncate">
+                  {track.name}
+                </BottomSheetTitle>
+                <div className="flex shrink-0 items-center">
+                  {actionButtons}
+                </div>
+              </div>
+            </BottomSheetHeader>
+            <div className="px-4 pb-6">{statsContent}</div>
+          </BottomSheetContent>
+        </BottomSheet>
+        {deleteDialog}
+      </>
+    )
+  }
 
   return (
     <div className="absolute z-10 w-80" style={style}>
       <Card className="bg-background/80 backdrop-blur-md">
         <CardHeader
           onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
           className="cursor-grab select-none active:cursor-grabbing"
         >
           <CardTitle className="truncate">{track.name}</CardTitle>
-          <CardAction>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => copyName(track.name)}
-              aria-label="Copy track name"
-            >
-              {isNameCopied ? (
-                <CheckIcon weight="bold" />
-              ) : (
-                <CopyIcon weight="duotone" />
-              )}
-            </Button>
-            {onShare && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={onShare}
-                aria-label="Share"
-              >
-                <ShareNetworkIcon weight="duotone" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => setIsDeleteOpen(true)}
-                aria-label="Delete track"
-              >
-                <TrashIcon weight="duotone" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <XIcon weight="bold" />
-            </Button>
-          </CardAction>
+          <CardAction>{actionButtons}</CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-            <StatRow
-              label="Distance"
-              value={formatDistance(stats.distanceKm)}
-            />
-            {uniqueKm != null && stats.distanceKm > 0 && (
-              <StatRow
-                label="Unique distance"
-                value={`${formatDistance(uniqueKm)} (${Math.round((uniqueKm / stats.distanceKm) * 100)}%)`}
-              />
-            )}
-            {stats.durationMs != null && (
-              <StatRow
-                label="Duration"
-                value={formatDuration(stats.durationMs)}
-              />
-            )}
-            {stats.movingTimeMs != null && (
-              <StatRow
-                label="Moving time"
-                value={formatDuration(stats.movingTimeMs)}
-              />
-            )}
-            {stats.avgPaceMinPerKm != null && (
-              <StatRow
-                label="Avg pace"
-                value={formatPace(stats.avgPaceMinPerKm)}
-              />
-            )}
-            {stats.avgMovingPaceMinPerKm != null && (
-              <StatRow
-                label="Avg moving pace"
-                value={formatPace(stats.avgMovingPaceMinPerKm)}
-              />
-            )}
-            {stats.avgSpeedKmh != null && (
-              <StatRow
-                label="Avg speed"
-                value={formatSpeed(stats.avgSpeedKmh)}
-              />
-            )}
-            {stats.avgMovingSpeedKmh != null && (
-              <StatRow
-                label="Avg moving speed"
-                value={formatSpeed(stats.avgMovingSpeedKmh)}
-              />
-            )}
-            {stats.hasElevation && (
-              <>
-                <StatRow
-                  label="Elevation ↑"
-                  value={formatElevation(stats.elevationGainM)}
-                />
-                <StatRow
-                  label="Elevation ↓"
-                  value={formatElevation(stats.elevationLossM)}
-                />
-              </>
-            )}
-          </div>
-          {stats.hasElevation && stats.elevationProfile.length >= 2 && (
-            <ElevationChart profile={stats.elevationProfile} />
-          )}
+          {statsContent}
         </CardContent>
       </Card>
-      {onDelete && (
-        <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <DialogContent showCloseButton={false}>
-            <DialogHeader>
-              <DialogTitle>Delete this track?</DialogTitle>
-              <DialogDescription>
-                &ldquo;{track.name}&rdquo; will be removed and the fog map will
-                be recalculated. This cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setIsDeleteOpen(false)
-                  onDelete()
-                }}
-              >
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      {deleteDialog}
     </div>
   )
 }

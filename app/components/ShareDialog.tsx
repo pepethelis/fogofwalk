@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { CaretLeftIcon, CaretRightIcon, CopyIcon, DownloadSimpleIcon } from "@phosphor-icons/react"
+import { CaretLeftIcon, CaretRightIcon, CopyIcon, DownloadSimpleIcon, XIcon } from "@phosphor-icons/react"
 import type { ParsedTrack } from "~/types/tracks"
 import type { PhotoEntry } from "~/types/photos"
 import { mapStore } from "~/lib/mapStore"
@@ -224,9 +224,20 @@ export function ShareDialog({
         <ShareMapView track={track} onReady={handleMapReady} />
       )}
 
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+      <DialogContent className="sm:max-w-md" showCloseButton={false} fullscreenOnMobile>
         <DialogHeader>
-          <DialogTitle>Share activity</DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle>Share activity</DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0 sm:hidden"
+              onClick={() => onOpenChange(false)}
+              aria-label="Close"
+            >
+              <XIcon weight="bold" />
+            </Button>
+          </div>
         </DialogHeader>
 
         {/* ── Live preview ─────────────────────────────────────────────── */}

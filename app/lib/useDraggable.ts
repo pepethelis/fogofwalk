@@ -11,6 +11,12 @@ export function useDraggable(initial: { x: number; y: number }) {
     e.preventDefault()
   }
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    dragging.current = true
+    origin.current = { x: touch.clientX - pos.x, y: touch.clientY - pos.y }
+  }
+
   useEffect(() => {
     const move = (e: MouseEvent) => {
       if (!dragging.current) return
@@ -19,16 +25,30 @@ export function useDraggable(initial: { x: number; y: number }) {
     const up = () => {
       dragging.current = false
     }
+    const touchMove = (e: TouchEvent) => {
+      if (!dragging.current) return
+      const touch = e.touches[0]
+      setPos({ x: touch.clientX - origin.current.x, y: touch.clientY - origin.current.y })
+    }
+    const touchEnd = () => {
+      dragging.current = false
+    }
+
     window.addEventListener("mousemove", move)
     window.addEventListener("mouseup", up)
+    window.addEventListener("touchmove", touchMove, { passive: true })
+    window.addEventListener("touchend", touchEnd)
     return () => {
       window.removeEventListener("mousemove", move)
       window.removeEventListener("mouseup", up)
+      window.removeEventListener("touchmove", touchMove)
+      window.removeEventListener("touchend", touchEnd)
     }
   }, [])
 
   return {
     style: { left: pos.x, top: pos.y } as React.CSSProperties,
     onMouseDown,
+    onTouchStart,
   }
 }

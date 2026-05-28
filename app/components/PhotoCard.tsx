@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { XIcon, ArrowLeftIcon, ArrowRightIcon } from "@phosphor-icons/react"
 import {
   Card,
@@ -8,7 +8,14 @@ import {
   CardContent,
 } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
+import {
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetHeader,
+  BottomSheetTitle,
+} from "~/components/ui/bottom-sheet"
 import { useDraggable } from "~/lib/useDraggable"
+import { useIsMobile } from "~/lib/useIsMobile"
 import type { PhotoGroup } from "~/types/photos"
 
 interface PhotoCardProps {
@@ -18,7 +25,10 @@ interface PhotoCardProps {
 
 export function PhotoCard({ group, onClose }: PhotoCardProps) {
   const [idx, setIdx] = useState(0)
-  const { style, onMouseDown } = useDraggable({
+  const [isOpen, setIsOpen] = useState(true)
+  const isDismissingRef = useRef(false)
+  const isMobile = useIsMobile()
+  const { style, onMouseDown, onTouchStart } = useDraggable({
     x: typeof window !== "undefined" ? window.innerWidth - 336 : 0,
     y: 16,
   })
@@ -27,19 +37,105 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
     setIdx(0)
   }, [group?.id])
 
+  // Reset dismiss guard when a new group is shown
+  useEffect(() => {
+    isDismissingRef.current = false
+    setIsOpen(true)
+  }, [group?.id])
+
   if (!group) return null
 
   const photo = group.photos[idx]
   const count = group.photos.length
 
+  function handleDismiss() {
+    if (isDismissingRef.current) return
+    isDismissingRef.current = true
+    if (isMobile) {
+      setIsOpen(false)
+      setTimeout(onClose, 200)
+    } else {
+      onClose()
+    }
+  }
+
+  const navControls = count > 1 && (
+    <div className="flex items-center justify-between px-2 py-1.5">
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        onClick={() => setIdx((i) => i - 1)}
+        disabled={idx === 0}
+        className={idx === 0 ? "invisible" : ""}
+        aria-label="Previous photo"
+      >
+        <ArrowLeftIcon weight="bold" />
+      </Button>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {idx + 1} / {count}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        onClick={() => setIdx((i) => i + 1)}
+        disabled={idx === count - 1}
+        className={idx === count - 1 ? "invisible" : ""}
+        aria-label="Next photo"
+      >
+        <ArrowRightIcon weight="bold" />
+      </Button>
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) handleDismiss()
+        }}
+      >
+        <BottomSheetContent onClose={handleDismiss}>
+          <BottomSheetHeader>
+            <div className="flex items-center justify-between gap-2">
+              <BottomSheetTitle className="truncate text-xs">
+                {new Date(photo.takenAtMs).toLocaleString()}
+              </BottomSheetTitle>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={handleDismiss}
+                aria-label="Close"
+                className="hidden shrink-0 sm:inline-flex"
+              >
+                <XIcon weight="bold" />
+              </Button>
+            </div>
+          </BottomSheetHeader>
+          <div className="pb-4">
+            {photo.objectUrl && (
+              <img
+                src={photo.objectUrl}
+                alt="Photo"
+                className="block max-h-[55vh] w-full object-contain"
+              />
+            )}
+            {navControls}
+          </div>
+        </BottomSheetContent>
+      </BottomSheet>
+    )
+  }
+
   return (
     <div className="absolute z-20 w-80" style={style}>
-      <Card className="bg-background/80 backdrop-blur-md overflow-hidden">
+      <Card className="overflow-hidden bg-background/80 backdrop-blur-md">
         <CardHeader
           onMouseDown={onMouseDown}
-          className="cursor-grab active:cursor-grabbing select-none"
+          onTouchStart={onTouchStart}
+          className="cursor-grab select-none active:cursor-grabbing"
         >
-          <CardTitle className="text-xs truncate">
+          <CardTitle className="truncate text-xs">
             {new Date(photo.takenAtMs).toLocaleString()}
           </CardTitle>
           <CardAction>
@@ -48,6 +144,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
               size="icon-xs"
               onClick={onClose}
               aria-label="Close"
+              className="hidden sm:inline-flex"
             >
               <XIcon weight="bold" />
             </Button>
@@ -58,36 +155,10 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
             <img
               src={photo.objectUrl}
               alt="Photo"
-              className="w-full h-auto block"
+              className="block h-auto w-full"
             />
           )}
-          {count > 1 && (
-            <div className="flex items-center justify-between px-2 py-1.5">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => setIdx((i) => i - 1)}
-                disabled={idx === 0}
-                className={idx === 0 ? "invisible" : ""}
-                aria-label="Previous photo"
-              >
-                <ArrowLeftIcon weight="bold" />
-              </Button>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {idx + 1} / {count}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => setIdx((i) => i + 1)}
-                disabled={idx === count - 1}
-                className={idx === count - 1 ? "invisible" : ""}
-                aria-label="Next photo"
-              >
-                <ArrowRightIcon weight="bold" />
-              </Button>
-            </div>
-          )}
+          {navControls}
         </CardContent>
       </Card>
     </div>

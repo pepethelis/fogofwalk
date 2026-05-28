@@ -24,9 +24,15 @@ import type { PhotoEntry, PhotoGroup } from "~/types/photos"
 
 const CLUSTER_PIXEL_RADIUS = 50
 
-function computeClusters(photos: PhotoEntry[], map: maplibregl.Map): PhotoGroup[] {
+function computeClusters(
+  photos: PhotoEntry[],
+  map: maplibregl.Map
+): PhotoGroup[] {
   if (photos.length === 0) return []
-  const projected = photos.map((p) => ({ photo: p, px: map.project([p.lng, p.lat]) }))
+  const projected = photos.map((p) => ({
+    photo: p,
+    px: map.project([p.lng, p.lat]),
+  }))
   const assigned = new Set<string>()
   const clusters: PhotoGroup[] = []
 
@@ -48,7 +54,15 @@ function computeClusters(photos: PhotoEntry[], map: maplibregl.Map): PhotoGroup[
     members.sort((a, b) => a.takenAtMs - b.takenAtMs)
     const lng = members.reduce((s, p) => s + p.lng, 0) / members.length
     const lat = members.reduce((s, p) => s + p.lat, 0) / members.length
-    clusters.push({ id: members.map((p) => p.id).sort().join("|"), photos: members, lng, lat })
+    clusters.push({
+      id: members
+        .map((p) => p.id)
+        .sort()
+        .join("|"),
+      photos: members,
+      lng,
+      lat,
+    })
   }
 
   return clusters
@@ -89,7 +103,6 @@ function setupMapLayers(map: maplibregl.Map, mode: MapMode): void {
     })
     map.setTerrain({ source: "terrain-source", exaggeration: 2.5 })
   }
-
 
   if (mode !== "relief") {
     map.addSource("fog-source", {
@@ -222,7 +235,8 @@ export function MapView({
         "overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.4);"
       const img = document.createElement("img")
       img.src = cluster.photos[0].objectUrl!
-      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;"
+      img.style.cssText =
+        "width:100%;height:100%;object-fit:cover;display:block;"
       circle.appendChild(img)
       el.appendChild(circle)
 
@@ -259,7 +273,7 @@ export function MapView({
       zoom: mapStore.initialZoom ?? 5,
       minZoom: 5,
       pitch: 0,
-      attributionControl: { compact: true },
+      attributionControl: { compact: false },
       // preserveDrawingBuffer is required for map.getCanvas() capture in the share export
       canvasContextAttributes: { preserveDrawingBuffer: true },
     })
@@ -316,7 +330,12 @@ export function MapView({
         onProcessingUpdateRef.current?.(msg.processedCount, true)
 
         // Persist the computed fog cache (requires live sources)
-        if (map && mapStore.sourcesReady && mapStore.tracks.length > 0 && mapStore.fogData) {
+        if (
+          map &&
+          mapStore.sourcesReady &&
+          mapStore.tracks.length > 0 &&
+          mapStore.fogData
+        ) {
           saveFogCache({
             trackIds: mapStore.tracks.map((t) => t.id).sort(),
             fogMode: mapStore.fogMode,
