@@ -133,6 +133,11 @@
   }
 }
 
+/* Vaul injects border-radius:8px inline via JS — neutralise it */
+[data-vaul-drawer] {
+  border-radius: 0 !important;
+}
+
 /* Keep MapLibre attribution/logo above the bottom control card */
 .maplibregl-ctrl-bottom-left,
 .maplibregl-ctrl-bottom-right {

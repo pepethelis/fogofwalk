@@ -9,11 +9,11 @@ import {
 } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
 import {
-  BottomSheet,
-  BottomSheetContent,
-  BottomSheetHeader,
-  BottomSheetTitle,
-} from "~/components/ui/bottom-sheet"
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "~/components/ui/drawer"
 import { useDraggable } from "~/lib/useDraggable"
 import { useIsMobile } from "~/lib/useIsMobile"
 import type { PhotoGroup } from "~/types/photos"
@@ -89,18 +89,18 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
 
   if (isMobile) {
     return (
-      <BottomSheet
+      <Drawer
         open={isOpen}
         onOpenChange={(open) => {
           if (!open) handleDismiss()
         }}
       >
-        <BottomSheetContent onClose={handleDismiss}>
-          <BottomSheetHeader>
+        <DrawerContent>
+          <DrawerHeader>
             <div className="flex items-center justify-between gap-2">
-              <BottomSheetTitle className="truncate text-xs">
+              <DrawerTitle className="truncate text-xs">
                 {new Date(photo.takenAtMs).toLocaleString()}
-              </BottomSheetTitle>
+              </DrawerTitle>
               <Button
                 variant="ghost"
                 size="icon-xs"
@@ -111,7 +111,7 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
                 <XIcon weight="bold" />
               </Button>
             </div>
-          </BottomSheetHeader>
+          </DrawerHeader>
           <div className="pb-4">
             {photo.objectUrl && (
               <img
@@ -122,8 +122,8 @@ export function PhotoCard({ group, onClose }: PhotoCardProps) {
             )}
             {navControls}
           </div>
-        </BottomSheetContent>
-      </BottomSheet>
+        </DrawerContent>
+      </Drawer>
     )
   }
 

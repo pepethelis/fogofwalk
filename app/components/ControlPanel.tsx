@@ -20,7 +20,7 @@ import { Badge } from "~/components/ui/badge"
 import { Switch } from "~/components/ui/switch"
 import type { FogMode, MapMode } from "~/types/tracks"
 import { Card, CardContent } from "./ui/card"
-import { BottomSheet, BottomSheetContent } from "~/components/ui/bottom-sheet"
+import { MoreDrawer } from "~/components/MoreDrawer"
 import { useIsMobile } from "~/lib/useIsMobile"
 
 interface ControlPanelProps {
@@ -209,7 +209,7 @@ export function ControlPanel({
           )}
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-lg"
             className="border-0 bg-background/80 backdrop-blur-md active:border-0 active:not-aria-[haspopup]:translate-y-0 aria-expanded:bg-background/80"
             onClick={() => setIsSettingsOpen((v) => !v)}
             aria-label="Toggle settings"
@@ -377,98 +377,17 @@ export function ControlPanel({
           </Card>
 
           {/* "More" options sheet */}
-          <BottomSheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
-            <BottomSheetContent onClose={() => setIsMoreOpen(false)}>
-              <div className="flex flex-col gap-3 px-4 pt-2 pb-8">
-                {/* Actions group */}
-                {(showAddPhotosOption || trackCount > 0) && (
-                  <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-                    {showAddPhotosOption && (
-                      <button
-                        onClick={() => {
-                          setIsMoreOpen(false)
-                          setTimeout(() => photoInputRef.current?.click(), 250)
-                        }}
-                        className="flex w-full items-center gap-4 px-4 py-3.5 text-left text-sm transition-colors active:bg-muted/50"
-                      >
-                        <ImageIcon
-                          weight="duotone"
-                          size={20}
-                          className="shrink-0 text-muted-foreground"
-                        />
-                        Add photos
-                      </button>
-                    )}
-                    {showAddPhotosOption && trackCount > 0 && (
-                      <div className="ml-14 border-t border-foreground/10" />
-                    )}
-                    {trackCount > 0 && (
-                      <button
-                        onClick={() => {
-                          setIsMoreOpen(false)
-                          setTimeout(onClearAll, 150)
-                        }}
-                        disabled={isProcessing}
-                        className="flex w-full items-center gap-4 px-4 py-3.5 text-left text-sm text-destructive transition-colors active:bg-muted/50 disabled:opacity-40"
-                      >
-                        <TrashIcon
-                          weight="duotone"
-                          size={20}
-                          className="shrink-0"
-                        />
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Navigation group */}
-                <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-                  <Link
-                    to="/stats"
-                    onClick={() => setIsMoreOpen(false)}
-                    className="flex w-full items-center gap-4 px-4 py-3.5 text-sm text-foreground transition-colors active:bg-muted/50"
-                  >
-                    <ChartBarIcon
-                      weight="duotone"
-                      size={20}
-                      className="shrink-0 text-muted-foreground"
-                    />
-                    Statistics
-                  </Link>
-                  <div className="ml-14 border-t border-foreground/10" />
-                  <Link
-                    to="/help"
-                    onClick={() => setIsMoreOpen(false)}
-                    className="flex w-full items-center gap-4 px-4 py-3.5 text-sm text-foreground transition-colors active:bg-muted/50"
-                  >
-                    <QuestionIcon
-                      weight="duotone"
-                      size={20}
-                      className="shrink-0 text-muted-foreground"
-                    />
-                    Help
-                  </Link>
-                </div>
-
-                {/* Status */}
-                {(isProcessing || trackCount > 0 || photoCount > 0) && (
-                  <p className="py-1 text-center text-xs text-muted-foreground">
-                    {isProcessing
-                      ? `Processing ${processedCount} of ${trackCount}…`
-                      : [
-                          trackCount > 0 &&
-                            `${trackCount} track${trackCount !== 1 ? "s" : ""}`,
-                          photoCount > 0 &&
-                            `${photoCount} photo${photoCount !== 1 ? "s" : ""}`,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                  </p>
-                )}
-              </div>
-            </BottomSheetContent>
-          </BottomSheet>
+          <MoreDrawer
+            isOpen={isMoreOpen}
+            onOpenChange={setIsMoreOpen}
+            trackCount={trackCount}
+            photoCount={photoCount}
+            isProcessing={isProcessing}
+            processedCount={processedCount}
+            showAddPhotosOption={showAddPhotosOption}
+            onAddPhotos={() => photoInputRef.current?.click()}
+            onClearAll={onClearAll}
+          />
         </>
       )}
     </>

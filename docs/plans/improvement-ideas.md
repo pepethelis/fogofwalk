@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Global Stats Dashboard (`/stats` route) — HIGH PRIORITY
+## 1. ~~Global Stats Dashboard (`/stats` route)~~ — ✅ DONE
 
 A separate full-page route (not a panel) showing aggregate statistics across all imported tracks.
 
@@ -37,7 +37,7 @@ A separate full-page route (not a panel) showing aggregate statistics across all
 
 ---
 
-## 2. Per-Track Deletion — HIGH IMPACT / MEDIUM EFFORT
+## 2. ~~Per-Track Deletion~~ — ✅ DONE
 
 Currently the only way to remove a bad import is to clear all data. Individual track deletion would
 fix this.
@@ -50,7 +50,7 @@ fix this.
 
 ---
 
-## 3. Unique Distance Tracking (Wandrer-inspired) — MEDIUM COMPLEXITY
+## 3. ~~Unique Distance Tracking (Wandrer-inspired)~~ — ✅ DONE
 
 On each file import, measure how much of the new track was *unique distance* vs. already explored.
 
@@ -158,7 +158,7 @@ full name without scrolling or inspecting.
 
 ---
 
-## 11. Mobile / PWA Improvements — MEDIUM PRIORITY
+## 11. ~~Mobile / PWA Improvements~~ — ✅ DONE
 
 - **PWA manifest + service worker**: allow "Add to Home Screen" on iOS/Android for offline map
   viewing
@@ -189,3 +189,21 @@ default.
   showing fog outline only vs. full track paths)
 - **Multi-user merge**: combine fog maps with friends or family to see collective exploration
 - **Leaderboards**: opt-in ranking by unique km, total km, elevation, or city coverage
+
+---
+
+## Summary
+
+- [x] **#1** — Global Stats Dashboard (`/stats` route)
+- [x] **#2** — Per-Track Deletion
+- [x] **#3** — Unique Distance Tracking (Wandrer-inspired)
+- [ ] **#4** — Activity Filtering & Sorting
+- [ ] **#5** — Customizable Fog Radius
+- [ ] **#6** — Additional File Format Support (TCX, KML)
+- [ ] **#7** — Elevation Smoothing
+- [ ] **#8** — Export (Stats CSV + Fog GeoJSON)
+- [x] **#9** — Copy Track Name Button
+- [ ] **#10** — Map UX Improvements
+- [x] **#11** — Mobile / PWA Improvements
+- [ ] **#12** — Performance & Reliability Improvements
+- [ ] **#13** — Backend / Cloud (Future)

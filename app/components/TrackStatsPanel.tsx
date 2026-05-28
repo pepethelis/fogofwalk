@@ -25,11 +25,11 @@ import {
   DialogFooter,
 } from "~/components/ui/dialog"
 import {
-  BottomSheet,
-  BottomSheetContent,
-  BottomSheetHeader,
-  BottomSheetTitle,
-} from "~/components/ui/bottom-sheet"
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "~/components/ui/drawer"
 import { ElevationChart } from "~/components/ElevationChart"
 import { useDraggable } from "~/lib/useDraggable"
 import { useIsMobile } from "~/lib/useIsMobile"
@@ -262,26 +262,26 @@ export function TrackStatsPanel({
   if (isMobile) {
     return (
       <>
-        <BottomSheet
+        <Drawer
           open={isOpen}
           onOpenChange={(open) => {
             if (!open) handleDismiss()
           }}
         >
-          <BottomSheetContent onClose={handleDismiss}>
-            <BottomSheetHeader>
+          <DrawerContent>
+            <DrawerHeader>
               <div className="flex items-center justify-between gap-2">
-                <BottomSheetTitle className="truncate">
+                <DrawerTitle className="truncate">
                   {track.name}
-                </BottomSheetTitle>
+                </DrawerTitle>
                 <div className="flex shrink-0 items-center">
                   {actionButtons}
                 </div>
               </div>
-            </BottomSheetHeader>
+            </DrawerHeader>
             <div className="px-4 pb-6">{statsContent}</div>
-          </BottomSheetContent>
-        </BottomSheet>
+          </DrawerContent>
+        </Drawer>
         {deleteDialog}
       </>
     )
