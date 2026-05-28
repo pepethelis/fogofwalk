@@ -6,13 +6,12 @@ import { mapStore } from "~/lib/mapStore"
 
 interface MapCompassProps {
   bearing: number
+  pitch: number
   onReset: () => void
   className?: string
 }
 
 export function MapCompass({ bearing, onReset, className }: MapCompassProps) {
-  const isNorth = Math.abs(bearing) < 0.5
-
   return (
     <ButtonGroup
       orientation="vertical"
@@ -44,8 +43,8 @@ export function MapCompass({ bearing, onReset, className }: MapCompassProps) {
         variant="outline"
         size="icon"
         onClick={onReset}
-        title={isNorth ? "Facing north" : "Reset to north"}
-        aria-label={isNorth ? "Facing north" : "Reset to north"}
+        title="Reset to north"
+        aria-label="Reset to north"
         className="border-none bg-transparent"
       >
         <NavigationArrowIcon

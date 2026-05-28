@@ -199,6 +199,7 @@ export function MapView({
 
   const clusterCacheRef = useRef<Map<number, PhotoGroup[]>>(new Map())
   const [bearing, setBearing] = useState(0)
+  const [pitch, setPitch] = useState(0)
 
   const rebuildPhotoMarkers = useCallback(() => {
     const map = mapStore.map
@@ -282,6 +283,7 @@ export function MapView({
     mapStore.map = map
 
     map.on("rotate", () => setBearing(map.getBearing()))
+    map.on("pitch", () => setPitch(map.getPitch()))
 
     // Persist map position synchronously on every moveend.
     // localStorage writes are synchronous so there's no async/timer race on page unload.
@@ -486,7 +488,10 @@ export function MapView({
       <div ref={containerRef} className="absolute inset-0 h-screen" />
       <MapCompass
         bearing={bearing}
-        onReset={() => mapStore.map?.easeTo({ bearing: 0, duration: 400 })}
+        pitch={pitch}
+        onReset={() =>
+          mapStore.map?.easeTo({ bearing: 0, pitch: 0, duration: 400 })
+        }
         className="absolute top-1.5 right-1.5 z-10 sm:top-3 sm:right-3"
       />
     </>
