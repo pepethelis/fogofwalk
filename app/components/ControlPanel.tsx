@@ -201,7 +201,7 @@ export function ControlPanel({
     <>
       {/* ── Settings / toggles ──────────────────────────────────────── */}
       {isMobile ? (
-        <div className="absolute top-3 left-3 z-10 flex flex-col">
+        <div className="absolute top-1.5 left-1.5 z-10 flex flex-col">
           {isSettingsOpen && (
             <Card className="bg-background/80 backdrop-blur-md">
               <CardContent className="flex flex-col gap-3">
@@ -225,7 +225,7 @@ export function ControlPanel({
           </Button>
         </div>
       ) : (
-        <Card className="absolute top-6 left-6 z-10 bg-background/80 backdrop-blur-md">
+        <Card className="absolute top-3 left-3 z-10 bg-background/80 backdrop-blur-md">
           <CardContent className="flex flex-col gap-3">
             {togglesList}
           </CardContent>

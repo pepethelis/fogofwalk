@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import maplibregl from "maplibre-gl"
 import type { StyleSpecification } from "maplibre-gl"
 import { Protocol } from "pmtiles"
@@ -21,6 +21,7 @@ import {
 } from "~/constants/fog"
 import type { MapMode, WorkerOutboundMessage } from "~/types/tracks"
 import type { PhotoEntry, PhotoGroup } from "~/types/photos"
+import { MapCompass } from "~/components/MapCompass"
 
 const CLUSTER_PIXEL_RADIUS = 50
 
@@ -197,6 +198,7 @@ export function MapView({
   showPhotosRef.current = showPhotos
 
   const clusterCacheRef = useRef<Map<number, PhotoGroup[]>>(new Map())
+  const [bearing, setBearing] = useState(0)
 
   const rebuildPhotoMarkers = useCallback(() => {
     const map = mapStore.map
@@ -278,6 +280,8 @@ export function MapView({
       canvasContextAttributes: { preserveDrawingBuffer: true },
     })
     mapStore.map = map
+
+    map.on("rotate", () => setBearing(map.getBearing()))
 
     // Persist map position synchronously on every moveend.
     // localStorage writes are synchronous so there's no async/timer race on page unload.
@@ -477,5 +481,14 @@ export function MapView({
     rebuildPhotoMarkers()
   }, [photos, showPhotos, rebuildPhotoMarkers])
 
-  return <div ref={containerRef} className="absolute inset-0 h-screen" />
+  return (
+    <>
+      <div ref={containerRef} className="absolute inset-0 h-screen" />
+      <MapCompass
+        bearing={bearing}
+        onReset={() => mapStore.map?.easeTo({ bearing: 0, duration: 400 })}
+        className="absolute top-1.5 right-1.5 z-10 sm:top-3 sm:right-3"
+      />
+    </>
+  )
 }
