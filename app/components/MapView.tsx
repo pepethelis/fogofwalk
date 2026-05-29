@@ -198,6 +198,10 @@ export function MapView({
   showPhotosRef.current = showPhotos
 
   const clusterCacheRef = useRef<Map<number, PhotoGroup[]>>(new Map())
+  // Cache for the tracks FeatureCollection — only rebuilt when mapStore.tracks.length changes.
+  // Prevents redundant GeoJSON reconstruction + GPU re-upload on every 300ms FOG_UPDATE.
+  const cachedTracksGeoJSON = useRef<ReturnType<typeof featureCollection> | null>(null)
+  const cachedTracksLength = useRef(-1)
   const [bearing, setBearing] = useState(0)
   const [pitch, setPitch] = useState(0)
 
@@ -364,13 +368,20 @@ export function MapView({
         ) as maplibregl.GeoJSONSource
         fogSource?.setData(msg.fogData)
 
-        const trackFeatures = mapStore.tracks.map((t) =>
-          lineString(t.coordinates, { name: t.name, id: t.id })
-        )
-        const tracksSource = map.getSource(
-          "tracks-source"
-        ) as maplibregl.GeoJSONSource
-        tracksSource?.setData(featureCollection(trackFeatures))
+        // Only rebuild and re-push tracks when the list has changed.
+        // mapStore.tracks is frozen during a processing run, so this fires at most
+        // once per add/delete — not on every 300ms FOG_UPDATE.
+        if (mapStore.tracks.length !== cachedTracksLength.current || !cachedTracksGeoJSON.current) {
+          const trackFeatures = mapStore.tracks.map((t) =>
+            lineString(t.coordinates, { name: t.name, id: t.id })
+          )
+          cachedTracksGeoJSON.current = featureCollection(trackFeatures)
+          cachedTracksLength.current = mapStore.tracks.length
+          const tracksSource = map.getSource(
+            "tracks-source"
+          ) as maplibregl.GeoJSONSource
+          tracksSource?.setData(cachedTracksGeoJSON.current)
+        }
 
         onProcessingUpdateRef.current?.(msg.processedCount, false)
       }
@@ -394,6 +405,10 @@ export function MapView({
       pendingStyleLoadRef.current = null
 
       setupMapLayers(map, mapMode)
+
+      // Invalidate tracks cache so FOG_UPDATE re-pushes to the new source.
+      cachedTracksGeoJSON.current = null
+      cachedTracksLength.current = -1
 
       map.setLayoutProperty(
         "tracks-layer",

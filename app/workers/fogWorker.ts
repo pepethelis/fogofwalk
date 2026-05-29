@@ -11,6 +11,8 @@ import {
   FOG_CLEAR_RADIUS_METERS,
   FOG_EMIT_INTERVAL_MS,
   SIMPLIFY_TOLERANCE,
+  TRACK_SIMPLIFY_TOLERANCE,
+  BUFFER_STEPS,
 } from "~/constants/fog"
 
 type FogFeature = Feature<Polygon | MultiPolygon>
@@ -58,7 +60,23 @@ function flushAndEmit(mode: FogMode) {
       ? difference(featureCollection([worldFog(), stripInnerRings(accumulated)])) ?? worldFog()
       : worldFog()
   }
-  const msg: WorkerOutboundMessage = { type: "FOG_UPDATE", fogData: fogPolygon, processedCount }
+
+  // Simplify the output before sending to reduce postMessage payload size and the
+  // vertex count that MapLibre must index and render. We do NOT mutate fogPolygon
+  // itself — it is used as the base polygon for the next difference() call.
+  let fogToEmit: FogFeature
+  try {
+    fogToEmit =
+      (simplify(fogPolygon, {
+        tolerance: SIMPLIFY_TOLERANCE,
+        highQuality: false,
+        mutate: false,
+      }) as FogFeature) ?? fogPolygon
+  } catch {
+    fogToEmit = fogPolygon
+  }
+
+  const msg: WorkerOutboundMessage = { type: "FOG_UPDATE", fogData: fogToEmit, processedCount }
   self.postMessage(msg)
   lastEmitTime = performance.now()
 }
@@ -104,11 +122,14 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
       try {
         const line = lineString(validCoords)
         const simplified = simplify(line, {
-          tolerance: SIMPLIFY_TOLERANCE,
+          tolerance: TRACK_SIMPLIFY_TOLERANCE,
           highQuality: false,
           mutate: true,
         })
-        const buf = buffer(simplified, FOG_CLEAR_RADIUS_METERS, { units: "meters" })
+        const buf = buffer(simplified, FOG_CLEAR_RADIUS_METERS, {
+          units: "meters",
+          steps: BUFFER_STEPS,
+        })
         if (buf) {
           if (mode === "corridor") {
             pendingBuffer = pendingBuffer

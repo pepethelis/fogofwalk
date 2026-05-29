@@ -4,7 +4,18 @@ export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 export const FOG_COLOR = "#0a0a1e"
 export const FOG_OPACITY = 0.8
 export const TRACK_COLOR = "#ff6b35"
-export const SIMPLIFY_TOLERANCE = 0.00005
+// Tolerance for the emitted fog polygon (controls fog-edge visual precision).
+// ~11 m at equator — invisible at any normal map zoom level.
+export const SIMPLIFY_TOLERANCE = 0.0001
+// Tolerance for track simplification *before* buffering.
+// Can be much larger than SIMPLIFY_TOLERANCE: the 100 m buffer hides any
+// corner-cutting up to ~50 m, so this does not affect the visual fog boundary.
+export const TRACK_SIMPLIFY_TOLERANCE = 0.0005
+// Number of arc segments used to approximate curves in the 100 m buffer.
+// Default (64) produces ~39,000° spacing (~10 m arcs at 100 m radius) — far more
+// precision than needed. 16 steps gives ~39 m arcs, indistinguishable at zoom ≤ 16,
+// and reduces each buffer polygon's vertex count by 4×.
+export const BUFFER_STEPS = 16
 export const TRACK_WIDTH_DEFAULT = 2
 export const TRACK_WIDTH_SELECTED = 4
 export const TRACK_OPACITY_DEFAULT = 0.85

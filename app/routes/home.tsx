@@ -147,20 +147,21 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
       files: files.map((f) => f.name),
     })
     const allTracks: ParsedTrack[] = []
-    for (const file of files) {
-      try {
-        const parsed = await parseFile(file)
+    const results = await Promise.allSettled(files.map((f) => parseFile(f)))
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i]
+      if (r.status === "fulfilled") {
         console.debug(
           "[clientAction] parsed",
-          file.name,
+          files[i].name,
           "→",
-          parsed.length,
+          r.value.length,
           "tracks, first track coords:",
-          parsed[0]?.coordinates.length
+          r.value[0]?.coordinates.length
         )
-        allTracks.push(...parsed)
-      } catch (e) {
-        console.warn(`[clientAction] failed to parse ${file.name}:`, e)
+        allTracks.push(...r.value)
+      } else {
+        console.warn(`[clientAction] failed to parse ${files[i].name}:`, r.reason)
       }
     }
     console.debug(
