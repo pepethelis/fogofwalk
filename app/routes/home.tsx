@@ -286,9 +286,12 @@ export default function Home() {
   // Track count before the latest upload so fitBounds can identify the new tracks.
   const prevTrackCountRef = useRef(0)
 
-  // Show upload dialog once the map is ready and no tracks are loaded yet
+  // Show upload dialog once the map is ready and no tracks are loaded.
+  // Use mapStore.tracks (set synchronously by clientLoader) rather than the
+  // trackCount React state, which can read as 0 during the brief window
+  // between initial render and loader-data reconciliation.
   useEffect(() => {
-    if (mapReady && trackCount === 0) {
+    if (mapReady && mapStore.tracks.length === 0) {
       setShowUploadDialog(true)
     }
   }, [mapReady])

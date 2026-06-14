@@ -3,6 +3,7 @@ import { FootprintsIcon } from "@phosphor-icons/react"
 import { PageShell } from "~/components/PageShell"
 import type { Route } from "./+types/stats"
 import { loadTracks } from "~/lib/storage"
+import { mapStore } from "~/lib/mapStore"
 import {
   sortTracks,
   computeLifetimeTotals,
@@ -31,7 +32,11 @@ interface StatsLoaderData {
 }
 
 export async function clientLoader(): Promise<StatsLoaderData> {
-  const tracks = sortTracks(await loadTracks())
+  // Prefer in-memory tracks (always current — updated before the IDB write in
+  // clientAction). Fall back to IDB only when navigating directly to /stats on
+  // a fresh page load before the home clientLoader has run.
+  const raw = mapStore.tracks.length > 0 ? mapStore.tracks : await loadTracks()
+  const tracks = sortTracks(raw)
   const now = Date.now()
   return {
     totals: computeLifetimeTotals(tracks),

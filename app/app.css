@@ -138,18 +138,9 @@
   border-radius: 0 !important;
 }
 
-/* Keep MapLibre attribution/logo above the bottom control card */
+/* Keep MapLibre attribution flush to the bottom corners */
 .maplibregl-ctrl-bottom-left,
 .maplibregl-ctrl-bottom-right {
-  /* Mobile card: bottom-3 (12px) + card height ~60px = top at ~72px from bottom */
-  margin-bottom: 0rem;
+  margin-bottom: 0;
   border-radius: 0%;
-}
-
-@media (min-width: 640px) {
-  .maplibregl-ctrl-bottom-left,
-  .maplibregl-ctrl-bottom-right {
-    /* Desktop card: bottom-6 (24px) + card height ~60px = top at ~84px from bottom */
-    margin-bottom: 6rem;
-  }
 }
