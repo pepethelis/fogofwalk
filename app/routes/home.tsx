@@ -8,6 +8,7 @@ import { MapView } from "~/components/MapView"
 import { ControlPanel } from "~/components/ControlPanel"
 import { FileUploadDialog } from "~/components/FileUploadDialog"
 import { PhotoErrorDialog } from "~/components/PhotoErrorDialog"
+import { ParseErrorDialog } from "~/components/ParseErrorDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
 import { ShareDialog } from "~/components/ShareDialog"
 import { PhotoCard } from "~/components/PhotoCard"
@@ -147,10 +148,11 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
       files: files.map((f) => f.name),
     })
     const allTracks: ParsedTrack[] = []
+    const failedFiles: string[] = []
     const results = await Promise.allSettled(files.map((f) => parseFile(f)))
     for (let i = 0; i < results.length; i++) {
       const r = results[i]
-      if (r.status === "fulfilled") {
+      if (r.status === "fulfilled" && r.value.length > 0) {
         console.debug(
           "[clientAction] parsed",
           files[i].name,
@@ -161,7 +163,12 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
         )
         allTracks.push(...r.value)
       } else {
-        console.warn(`[clientAction] failed to parse ${files[i].name}:`, r.reason)
+        if (r.status === "rejected") {
+          console.warn(`[clientAction] failed to parse ${files[i].name}:`, r.reason)
+        } else {
+          console.warn(`[clientAction] no tracks found in ${files[i].name}`)
+        }
+        failedFiles.push(files[i].name)
       }
     }
     console.debug(
@@ -185,6 +192,8 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
       intent: "add-files" as const,
       count: files.length,
       trackCount: mapStore.tracks.length,
+      newTracksCount: allTracks.length,
+      failedFiles,
     }
   }
 
@@ -266,6 +275,8 @@ export default function Home() {
   const [showPhotos, setShowPhotos] = useState(true)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
   const [photoErrorOpen, setPhotoErrorOpen] = useState(false)
+  const [parseFailedFiles, setParseFailedFiles] = useState<string[]>([])
+  const [isParseErrorOpen, setIsParseErrorOpen] = useState(false)
   // Per-track unique distance map — recomputed whenever mapStore.tracks changes.
   // Lazy initializer runs once on mount; mapStore.tracks is pre-sorted by clientLoader.
   const [perTrackUniqueKm, setPerTrackUniqueKm] = useState(
@@ -411,12 +422,18 @@ export default function Home() {
     if (!data) return
     if (data.intent === "add-files") {
       prevTrackCountRef.current = trackCount // snapshot pre-upload count for fitBounds fallback
-      isNewUploadRef.current = true // triggers fitBounds in the isProcessing effect below
-      setTrackCount(data.trackCount)
-      setIsProcessing(true)
-      setProcessedCount(0)
       setShowUploadDialog(false)
       setPerTrackUniqueKm(computePerTrackUniqueDistances(mapStore.tracks))
+      if (data.newTracksCount > 0) {
+        isNewUploadRef.current = true // triggers fitBounds in the isProcessing effect below
+        setTrackCount(data.trackCount)
+        setIsProcessing(true)
+        setProcessedCount(0)
+      }
+      if (data.failedFiles.length > 0) {
+        setParseFailedFiles(data.failedFiles)
+        setIsParseErrorOpen(true)
+      }
     }
     if (data.intent === "clear-all") {
       setTrackCount(0)
@@ -583,6 +600,11 @@ export default function Home() {
           <PhotoErrorDialog
             open={photoErrorOpen}
             onOpenChange={setPhotoErrorOpen}
+          />
+          <ParseErrorDialog
+            open={isParseErrorOpen}
+            onOpenChange={setIsParseErrorOpen}
+            failedFiles={parseFailedFiles}
           />
           <PhotoCard
             group={selectedGroup}
