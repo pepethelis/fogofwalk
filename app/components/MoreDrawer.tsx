@@ -165,10 +165,7 @@ export function MoreDrawer({
                   className="mr-3 size-5 shrink-0 text-muted-foreground"
                 />
                 <span className="flex-1 text-sm">Show fog</span>
-                <Switch
-                  checked={showFog}
-                  onCheckedChange={onShowFogChange}
-                />
+                <Switch checked={showFog} onCheckedChange={onShowFogChange} />
               </div>
               <div className="flex items-center px-3 py-2.5">
                 <PathIcon
@@ -227,7 +224,11 @@ export function MoreDrawer({
 
             {/* 3. Navigation */}
             <div className="overflow-hidden ring-1 ring-foreground/10">
-              <Item variant="muted" render={<Link to="/stats" />} onClick={close}>
+              <Item
+                variant="muted"
+                render={<Link to="/stats" />}
+                onClick={close}
+              >
                 <ItemMedia variant="icon">
                   <ChartBarIcon
                     weight="duotone"
@@ -240,7 +241,11 @@ export function MoreDrawer({
                 <CaretRightIcon className="size-4 shrink-0 text-muted-foreground" />
               </Item>
               <div className="ml-10 border-t border-foreground/10" />
-              <Item variant="muted" render={<Link to="/help" />} onClick={close}>
+              <Item
+                variant="muted"
+                render={<Link to="/help" />}
+                onClick={close}
+              >
                 <ItemMedia variant="icon">
                   <QuestionIcon
                     weight="duotone"

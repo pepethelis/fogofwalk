@@ -164,7 +164,10 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
         allTracks.push(...r.value)
       } else {
         if (r.status === "rejected") {
-          console.warn(`[clientAction] failed to parse ${files[i].name}:`, r.reason)
+          console.warn(
+            `[clientAction] failed to parse ${files[i].name}:`,
+            r.reason
+          )
         } else {
           console.warn(`[clientAction] no tracks found in ${files[i].name}`)
         }
@@ -248,7 +251,10 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     await deleteTrack(trackId)
     await clearFogCache()
 
-    return { intent: "delete-track" as const, trackCount: mapStore.tracks.length }
+    return {
+      intent: "delete-track" as const,
+      trackCount: mapStore.tracks.length,
+    }
   }
 
   return null
@@ -279,8 +285,8 @@ export default function Home() {
   const [isParseErrorOpen, setIsParseErrorOpen] = useState(false)
   // Per-track unique distance map — recomputed whenever mapStore.tracks changes.
   // Lazy initializer runs once on mount; mapStore.tracks is pre-sorted by clientLoader.
-  const [perTrackUniqueKm, setPerTrackUniqueKm] = useState(
-    () => computePerTrackUniqueDistances(mapStore.tracks)
+  const [perTrackUniqueKm, setPerTrackUniqueKm] = useState(() =>
+    computePerTrackUniqueDistances(mapStore.tracks)
   )
   // Loading overlay: starts visible, fades out when map is ready, then unmounts
   const [overlayDone, setOverlayDone] = useState(false)
@@ -318,7 +324,13 @@ export default function Home() {
     const fc = featureCollection([lineString(track.coordinates)])
     const [w, s, e, n] = bbox(fc)
     if (isFinite(w)) {
-      mapStore.map.fitBounds([[w, s], [e, n]], { padding: 80, maxZoom: 14 })
+      mapStore.map.fitBounds(
+        [
+          [w, s],
+          [e, n],
+        ],
+        { padding: 80, maxZoom: 14 }
+      )
     }
   }, [mapReady])
 

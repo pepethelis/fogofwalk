@@ -84,10 +84,10 @@ export function ControlPanel({
       />
 
       {/* FAB — grouped visually with the compass (top-right) */}
-      <div className="absolute right-1.5 top-28 z-10 flex items-center gap-2 sm:right-3">
+      <div className="absolute top-28 right-1.5 z-10 flex items-center gap-2 sm:right-3">
         {isProcessing && (
           <div className="flex h-8 items-center gap-2 border border-border bg-background/80 px-2.5 backdrop-blur-md">
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {processedCount}/{trackCount}
             </span>
             <div className="relative h-1 w-20 overflow-hidden bg-muted">
