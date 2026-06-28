@@ -11,8 +11,17 @@ import { PhotoErrorDialog } from "~/components/PhotoErrorDialog"
 import { ParseErrorDialog } from "~/components/ParseErrorDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
 import { ShareDialog } from "~/components/ShareDialog"
+import { CompositeShareDialog } from "~/components/CompositeShareDialog"
 import { PhotoCard } from "~/components/PhotoCard"
 import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog"
+import { Button } from "~/components/ui/button"
 import { mapStore, worldFogGeoJSON } from "~/lib/mapStore"
 import { parseFile } from "~/lib/parsers"
 import { processPhotoFiles } from "~/lib/photos"
@@ -275,8 +284,10 @@ export default function Home() {
   const [mapMode, setMapMode] = useState<MapMode>("flat")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [mapReady, setMapReady] = useState(false)
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
+  const [pendingTrackId, setPendingTrackId] = useState<string | null>(null)
   const [showShareDialog, setShowShareDialog] = useState(false)
+  const [showCompositeShareDialog, setShowCompositeShareDialog] = useState(false)
   const [photos, setPhotos] = useState<PhotoEntry[]>(_restoredPhotos)
   const [showPhotos, setShowPhotos] = useState(true)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
@@ -318,7 +329,7 @@ export default function Home() {
     if (!mapReady) return
     const trackId = searchParams.get("track")
     if (!trackId) return
-    setSelectedTrackId(trackId)
+    setSelectedTrackIds([trackId])
     const track = mapStore.tracks.find((t) => t.id === trackId)
     if (!track || !mapStore.map) return
     const fc = featureCollection([lineString(track.coordinates)])
@@ -451,13 +462,19 @@ export default function Home() {
       setTrackCount(0)
       setProcessedCount(0)
       setIsProcessing(false)
-      setSelectedTrackId(null)
+      setSelectedTrackIds([])
+      setPendingTrackId(null)
+      setShowShareDialog(false)
+      setShowCompositeShareDialog(false)
       setPhotos([])
       setSelectedGroup(null)
       setPerTrackUniqueKm(new Map())
     }
     if (data.intent === "delete-track") {
-      setSelectedTrackId(null)
+      setSelectedTrackIds([])
+      setPendingTrackId(null)
+      setShowShareDialog(false)
+      setShowCompositeShareDialog(false)
       setTrackCount(data.trackCount)
       setPerTrackUniqueKm(computePerTrackUniqueDistances(mapStore.tracks))
       if (data.trackCount > 0) {
@@ -554,8 +571,30 @@ export default function Home() {
     }
   }
 
-  const selectedTrack = selectedTrackId
-    ? (mapStore.tracks.find((t) => t.id === selectedTrackId) ?? null)
+  function handleTrackSelect(id: string | null) {
+    if (!id) {
+      setSelectedTrackIds([])
+      setPendingTrackId(null)
+      return
+    }
+    if (selectedTrackIds.includes(id)) {
+      setSelectedTrackIds((prev) => prev.filter((x) => x !== id))
+      setPendingTrackId(null)
+      return
+    }
+    if (selectedTrackIds.length === 0) {
+      setSelectedTrackIds([id])
+    } else {
+      setPendingTrackId(id)
+    }
+  }
+
+  const selectedTracks = selectedTrackIds
+    .map((id) => mapStore.tracks.find((t) => t.id === id))
+    .filter((t): t is ParsedTrack => t != null)
+
+  const pendingTrack = pendingTrackId
+    ? mapStore.tracks.find((t) => t.id === pendingTrackId) ?? null
     : null
 
   return (
@@ -574,8 +613,8 @@ export default function Home() {
           showFog={showFog}
           onMapReady={() => setMapReady(true)}
           onProcessingUpdate={handleProcessingUpdate}
-          selectedTrackId={selectedTrackId}
-          onTrackSelect={setSelectedTrackId}
+          selectedTrackIds={selectedTrackIds}
+          onTrackSelect={handleTrackSelect}
           mapMode={mapMode}
           photos={photos}
           showPhotos={showPhotos}
@@ -622,7 +661,7 @@ export default function Home() {
             group={selectedGroup}
             onClose={() => setSelectedGroup(null)}
           />
-          {selectedTrack && (
+          {selectedTracks.length > 0 && (
             <ErrorBoundary
               fallback={(error, reset) => (
                 <div className="absolute right-4 bottom-4 z-10 w-80">
@@ -631,10 +670,14 @@ export default function Home() {
               )}
             >
               <TrackStatsPanel
-                track={selectedTrack}
-                uniqueKm={perTrackUniqueKm.get(selectedTrack.id)}
+                tracks={selectedTracks}
+                uniqueKms={perTrackUniqueKm}
+                onRemoveTrack={(id) =>
+                  setSelectedTrackIds((prev) => prev.filter((x) => x !== id))
+                }
                 onClose={() => {
-                  setSelectedTrackId(null)
+                  setSelectedTrackIds([])
+                  setPendingTrackId(null)
                   setSearchParams(
                     (prev) => {
                       const next = new URLSearchParams(prev)
@@ -644,18 +687,68 @@ export default function Home() {
                     { replace: true }
                   )
                 }}
-                onShare={() => setShowShareDialog(true)}
-                onDelete={() => handleDeleteTrack(selectedTrack.id)}
+                onShare={
+                  selectedTracks.length === 1
+                    ? () => setShowShareDialog(true)
+                    : () => setShowCompositeShareDialog(true)
+                }
+                onDelete={selectedTracks.length === 1 ? () => handleDeleteTrack(selectedTracks[0].id) : undefined}
               />
             </ErrorBoundary>
           )}
-          {showShareDialog && selectedTrack && (
+          {showShareDialog && selectedTracks.length === 1 && (
             <ShareDialog
               open={showShareDialog}
               onOpenChange={setShowShareDialog}
-              track={selectedTrack}
+              track={selectedTracks[0]}
               photos={photos}
             />
+          )}
+          {showCompositeShareDialog && selectedTracks.length > 1 && (
+            <CompositeShareDialog
+              open={showCompositeShareDialog}
+              onOpenChange={setShowCompositeShareDialog}
+              tracks={selectedTracks}
+              uniqueKms={perTrackUniqueKm}
+              photos={photos}
+            />
+          )}
+          {pendingTrack && (
+            <Dialog open onOpenChange={(open) => { if (!open) setPendingTrackId(null) }}>
+              <DialogContent showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>Add to stats?</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  &ldquo;{pendingTrack.name}&rdquo;
+                </p>
+                <DialogFooter className="flex-col gap-2 sm:flex-row">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPendingTrackId(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedTrackIds([pendingTrackId!])
+                      setPendingTrackId(null)
+                    }}
+                  >
+                    Replace
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSelectedTrackIds((prev) => [...prev, pendingTrackId!])
+                      setPendingTrackId(null)
+                    }}
+                  >
+                    Add to stats
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
         </>
       )}
