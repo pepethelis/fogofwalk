@@ -13,55 +13,94 @@ import {
 import { Button } from "~/components/ui/button"
 import {
   type StatKey,
+  type CompositeStatKey,
   type BackgroundMode,
   STAT_DEFS,
+  COMPOSITE_STAT_DEFS,
   CARD_WIDTH,
   CARD_HEIGHT,
+  computeCompositeStats,
   drawShareCard,
+  drawCompositeShareCard,
   exportShareCard,
+  exportCompositeShareCard,
   copyShareCard,
+  copyCompositeShareCard,
   getAvailableStats,
+  getAvailableCompositeStats,
   getDefaultStats,
+  getDefaultCompositeStats,
   filterPhotosForTrack,
+  filterPhotosForTracks,
 } from "~/lib/shareCard"
 import { ShareMapView } from "~/components/ShareMapView"
 
-// ─── Preview dimensions (1/4 scale of 1080×1440) ─────────────────────────────
 const PREVIEW_W = 270
 const PREVIEW_H = 360
-
 const MAX_SELECTED = 4
 const BLUR_PRESETS = [0, 2, 4, 6, 8, 12, 20]
 
 interface ShareDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  track: ParsedTrack
+  tracks: ParsedTrack[]
+  uniqueKms: Map<string, number>
   photos: PhotoEntry[]
 }
 
 export function ShareDialog({
   open,
   onOpenChange,
-  track,
+  tracks,
+  uniqueKms,
   photos,
 }: ShareDialogProps) {
-  const trackPhotos = useMemo(
-    () => filterPhotosForTrack(photos, track),
-    [photos, track]
+  const isSingle = tracks.length === 1
+  const track = tracks[0]
+
+  const composite = useMemo(
+    () => (isSingle ? null : computeCompositeStats(tracks, uniqueKms)),
+    [isSingle, tracks, uniqueKms]
   )
-  const availableStats = useMemo(() => getAvailableStats(track), [track])
+  const availableStats = useMemo(
+    () => (isSingle ? getAvailableStats(track) : getAvailableCompositeStats(composite!)),
+    [isSingle, track, composite]
+  )
+  const trackPhotos = useMemo(
+    () =>
+      isSingle
+        ? filterPhotosForTrack(photos, track)
+        : filterPhotosForTracks(photos, tracks),
+    [isSingle, photos, track, tracks]
+  )
+  const selectionInfo = useMemo(() => {
+    if (isSingle) return null
+    const days = new Set<string>()
+    for (const t of tracks) {
+      if (t.startedAtMs != null) {
+        const d = new Date(t.startedAtMs)
+        days.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)
+      }
+    }
+    const n = tracks.length
+    if (days.size === 0) return `${n} tracks`
+    if (days.size === 1) return `${n} tracks from a single day`
+    return `${n} tracks from ${days.size} days`
+  }, [isSingle, tracks])
 
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>(() =>
     trackPhotos.length > 0 ? "photo" : "dark"
   )
   const [blurAmount, setBlurAmount] = useState(6)
-  const [mapBaseSnapshot, setMapBaseSnapshot] = useState<ImageBitmap | null>(null)
-  const [mapTrackPoints, setMapTrackPoints] = useState<{ x: number; y: number }[] | null>(null)
-  const [isMapReady, setIsMapReady] = useState(false)
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
-  const [enabledStats, setEnabledStats] = useState<StatKey[]>(() =>
-    getDefaultStats(track)
+  const [mapBaseSnapshot, setMapBaseSnapshot] = useState<ImageBitmap | null>(null)
+  // Unified: one array of pixel-coord arrays, one per track.
+  const [mapTrackPointsPerTrack, setMapTrackPointsPerTrack] = useState<
+    Array<{ x: number; y: number }[]> | null
+  >(null)
+  const [isMapReady, setIsMapReady] = useState(false)
+  const [enabledStats, setEnabledStats] = useState<string[]>(() =>
+    isSingle ? getDefaultStats(track) : getDefaultCompositeStats(composite!)
   )
   const [isExporting, setIsExporting] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
@@ -70,84 +109,96 @@ export function ShareDialog({
 
   const previewRef = useRef<HTMLCanvasElement>(null)
 
-  // When switching to map mode, serve from cache if available (avoids a new WebGL context)
   useEffect(() => {
     if (backgroundMode !== "map") {
-      // Switching away: null out state but leave the cache intact so the next
-      // open of the same track is instant. Only close the bitmap if it is NOT
-      // the cached reference (i.e. it was created outside the cache path).
       setMapBaseSnapshot((prev) => {
-        if (prev && mapStore.shareCardCache?.baseMap !== prev) prev.close()
+        if (prev) {
+          // Single-track: only close if it's not the shared cache reference.
+          // Multi-track: always close (no persistent cache).
+          if (!isSingle || mapStore.shareCardCache?.baseMap !== prev) prev.close()
+        }
         return null
       })
-      setMapTrackPoints(null)
+      setMapTrackPointsPerTrack(null)
       setIsMapReady(false)
       return
     }
-    // Switching to map mode: check the cache first
-    const cached = mapStore.shareCardCache
-    if (cached?.trackId === track.id) {
-      setMapBaseSnapshot(cached.baseMap)
-      setMapTrackPoints(cached.trackPoints)
-      setIsMapReady(true)
-    }
-  }, [backgroundMode, track.id])
-
-  // Called by ShareMapView once base map + projected track points are ready
-  const handleMapReady = useCallback(
-    (baseMap: ImageBitmap, trackPointsPerTrack: Array<{ x: number; y: number }[]>) => {
-      const trackPoints = trackPointsPerTrack[0] ?? []
-      // Update cache (close previous entry if it's for a different track)
-      if (mapStore.shareCardCache && mapStore.shareCardCache.trackId !== track.id) {
-        mapStore.shareCardCache.baseMap.close()
+    if (isSingle) {
+      const cached = mapStore.shareCardCache
+      if (cached?.trackId === track.id) {
+        setMapBaseSnapshot(cached.baseMap)
+        setMapTrackPointsPerTrack([cached.trackPoints])
+        setIsMapReady(true)
       }
-      mapStore.shareCardCache = { trackId: track.id, baseMap, trackPoints }
+    }
+  }, [backgroundMode, isSingle, track?.id])
+
+  const handleMapReady = useCallback(
+    (baseMap: ImageBitmap, pts: Array<{ x: number; y: number }[]>) => {
+      if (isSingle) {
+        const trackPoints = pts[0] ?? []
+        if (mapStore.shareCardCache && mapStore.shareCardCache.trackId !== track.id) {
+          mapStore.shareCardCache.baseMap.close()
+        }
+        mapStore.shareCardCache = { trackId: track.id, baseMap, trackPoints }
+      }
       setMapBaseSnapshot(baseMap)
-      setMapTrackPoints(trackPoints)
+      setMapTrackPointsPerTrack(pts)
       setIsMapReady(true)
     },
-    [track.id]
+    [isSingle, track?.id]
   )
 
-  // Re-render preview whenever relevant state changes.
-  // `open` is in deps so this fires when the Base UI portal first commits the canvas to DOM.
-  // requestAnimationFrame defers past the portal's own paint so previewRef is guaranteed set.
-  // The callback is async so drawShareCard's internal awaits (fonts.ready, createImageBitmap)
-  // run in the correct order — without await the first photo-mode paint would flash blank.
   useEffect(() => {
     if (!open) return
     const raf = requestAnimationFrame(async () => {
       const canvas = previewRef.current
       if (!canvas) return
-      // Canvas internal resolution = full card (1080×1440); CSS size = 270×360 (¼ scale).
-      // The browser scales down automatically — intentional, not a bug.
       canvas.width = CARD_WIDTH
       canvas.height = CARD_HEIGHT
       const photo = trackPhotos[selectedPhotoIndex] ?? null
-      await drawShareCard(canvas, {
-        track,
-        photo,
-        mapBaseSnapshot,
-        mapTrackPoints,
-        backgroundMode,
-        blurAmount,
-        enabledStats,
-      })
+      if (isSingle) {
+        await drawShareCard(canvas, {
+          track,
+          photo,
+          mapBaseSnapshot,
+          mapTrackPoints: mapTrackPointsPerTrack?.[0] ?? null,
+          backgroundMode,
+          blurAmount,
+          enabledStats: enabledStats as StatKey[],
+        })
+      } else {
+        await drawCompositeShareCard(canvas, {
+          tracks,
+          composite: composite!,
+          enabledStats: enabledStats as CompositeStatKey[],
+          photo,
+          mapBaseSnapshot,
+          mapTrackPointsPerTrack,
+          backgroundMode,
+          blurAmount,
+          selectionInfo: selectionInfo!,
+        })
+      }
     })
     return () => cancelAnimationFrame(raf)
   }, [
     open,
-    selectedPhotoIndex,
-    enabledStats,
+    isSingle,
     track,
+    tracks,
+    composite,
+    enabledStats,
     trackPhotos,
+    selectedPhotoIndex,
+    mapBaseSnapshot,
+    mapTrackPointsPerTrack,
     backgroundMode,
     blurAmount,
-    mapBaseSnapshot,
-    mapTrackPoints,
+    selectionInfo,
   ])
 
-  function toggleStat(key: StatKey) {
+  function toggleStat(key: string) {
     setEnabledStats((prev) => {
       if (prev.includes(key)) {
         if (prev.length <= 1) return prev
@@ -158,26 +209,45 @@ export function ShareDialog({
     })
   }
 
+  function buildOpts() {
+    const photo = trackPhotos[selectedPhotoIndex] ?? null
+    if (isSingle) {
+      return {
+        track,
+        photo,
+        mapBaseSnapshot,
+        mapTrackPoints: mapTrackPointsPerTrack?.[0] ?? null,
+        backgroundMode,
+        blurAmount,
+        enabledStats: enabledStats as StatKey[],
+      }
+    }
+    return {
+      tracks,
+      composite: composite!,
+      enabledStats: enabledStats as CompositeStatKey[],
+      photo,
+      mapBaseSnapshot,
+      mapTrackPointsPerTrack,
+      backgroundMode,
+      blurAmount,
+      selectionInfo: selectionInfo!,
+    }
+  }
+
   async function handleCopy() {
     setIsCopying(true)
     setActionError(null)
     try {
-      const photo = trackPhotos[selectedPhotoIndex] ?? null
-      await copyShareCard({
-        track,
-        photo,
-        mapBaseSnapshot,
-        mapTrackPoints,
-        backgroundMode,
-        blurAmount,
-        enabledStats,
-      })
+      if (isSingle) {
+        await copyShareCard(buildOpts() as Parameters<typeof copyShareCard>[0])
+      } else {
+        await copyCompositeShareCard(buildOpts() as Parameters<typeof copyCompositeShareCard>[0])
+      }
       setIsCopied(true)
       setTimeout(() => setIsCopied(false), 2000)
     } catch (err) {
-      // Clipboard API unavailable (non-HTTPS, Firefox without permission, etc.)
-      const msg = err instanceof Error ? err.message : "Copy failed"
-      setActionError(msg)
+      setActionError(err instanceof Error ? err.message : "Copy failed")
       setTimeout(() => setActionError(null), 4000)
     } finally {
       setIsCopying(false)
@@ -188,19 +258,13 @@ export function ShareDialog({
     setIsExporting(true)
     setActionError(null)
     try {
-      const photo = trackPhotos[selectedPhotoIndex] ?? null
-      await exportShareCard({
-        track,
-        photo,
-        mapBaseSnapshot,
-        mapTrackPoints,
-        backgroundMode,
-        blurAmount,
-        enabledStats,
-      })
+      if (isSingle) {
+        await exportShareCard(buildOpts() as Parameters<typeof exportShareCard>[0])
+      } else {
+        await exportCompositeShareCard(buildOpts() as Parameters<typeof exportCompositeShareCard>[0])
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Export failed"
-      setActionError(msg)
+      setActionError(err instanceof Error ? err.message : "Export failed")
       setTimeout(() => setActionError(null), 4000)
     } finally {
       setIsExporting(false)
@@ -218,17 +282,16 @@ export function ShareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Off-screen map renderer — mounted only when map mode is active and no cached data.
-          Once isMapReady is true the result is stored in mapStore.shareCardCache and this
-          component unmounts, releasing the WebGL context. */}
       {backgroundMode === "map" && !isMapReady && (
-        <ShareMapView tracks={[track]} onReady={handleMapReady} />
+        <ShareMapView tracks={tracks} onReady={handleMapReady} />
       )}
 
       <DialogContent className="sm:max-w-md" showCloseButton={false} fullscreenOnMobile>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2">
-            <DialogTitle>Share activity</DialogTitle>
+            <DialogTitle>
+              {isSingle ? "Share activity" : `Share ${tracks.length} activities`}
+            </DialogTitle>
             <Button
               variant="ghost"
               size="icon-xs"
@@ -239,9 +302,11 @@ export function ShareDialog({
               <XIcon weight="bold" />
             </Button>
           </div>
+          {selectionInfo && (
+            <p className="text-sm text-muted-foreground">{selectionInfo}</p>
+          )}
         </DialogHeader>
 
-        {/* ── Live preview ─────────────────────────────────────────────── */}
         <div className="flex justify-center py-1">
           <canvas
             ref={previewRef}
@@ -263,7 +328,6 @@ export function ShareDialog({
           )}
         </div>
 
-        {/* ── Background mode selector ──────────────────────────────────── */}
         <div className="flex flex-col gap-2">
           <span className="text-xs text-muted-foreground">Background</span>
           <div className="flex gap-1.5">
@@ -283,7 +347,6 @@ export function ShareDialog({
           </div>
         </div>
 
-        {/* ── Photo navigation (only in photo mode, multiple photos) ────── */}
         {backgroundMode === "photo" && trackPhotos.length > 1 && (
           <div className="flex flex-col gap-2">
             <span className="text-xs text-muted-foreground">Photo</span>
@@ -313,7 +376,6 @@ export function ShareDialog({
           </div>
         )}
 
-        {/* ── Blur buttons (hidden in dark mode) ───────────────────────── */}
         {backgroundMode !== "dark" && (
           <div className="flex flex-col gap-2">
             <span className="text-xs text-muted-foreground">Blur</span>
@@ -332,7 +394,6 @@ export function ShareDialog({
           </div>
         )}
 
-        {/* ── Stats toggles ─────────────────────────────────────────────── */}
         <div className="flex flex-col gap-2">
           <span className="text-xs text-muted-foreground">
             Stats{" "}
@@ -343,6 +404,9 @@ export function ShareDialog({
           <div className="flex flex-wrap gap-1.5">
             {availableStats.map((key) => {
               const selected = enabledStats.includes(key)
+              const label = isSingle
+                ? STAT_DEFS[key as StatKey].label
+                : COMPOSITE_STAT_DEFS[key as CompositeStatKey].label
               return (
                 <Button
                   key={key}
@@ -351,14 +415,13 @@ export function ShareDialog({
                   onClick={() => toggleStat(key)}
                   aria-pressed={selected}
                 >
-                  {STAT_DEFS[key].label}
+                  {label}
                 </Button>
               )
             })}
           </div>
         </div>
 
-        {/* ── Footer ────────────────────────────────────────────────────── */}
         {actionError && (
           <p className="text-xs text-destructive">{actionError}</p>
         )}

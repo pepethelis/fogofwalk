@@ -302,8 +302,6 @@ export function MapView({
       })
       if (features.length > 0) {
         onTrackSelectRef.current?.(features[0].properties?.id ?? null)
-      } else {
-        onTrackSelectRef.current?.(null)
       }
     })
 
@@ -426,16 +424,16 @@ export function MapView({
 
       const sids = selectedTrackIdsRef.current
       if (sids.length > 0) {
-        const isSelected = ["in", ["get", "id"], ["literal", sids]]
+        const selectionExpr = ["in", ["get", "id"], ["literal", sids]]
         map.setPaintProperty("tracks-layer", "line-width", [
           "case",
-          isSelected,
+          selectionExpr,
           TRACK_WIDTH_SELECTED,
           TRACK_WIDTH_DEFAULT,
         ])
         map.setPaintProperty("tracks-layer", "line-opacity", [
           "case",
-          isSelected,
+          selectionExpr,
           TRACK_OPACITY_SELECTED,
           TRACK_OPACITY_DIM,
         ])
@@ -480,16 +478,16 @@ export function MapView({
       )
       return
     }
-    const isSelected = ["in", ["get", "id"], ["literal", selectedTrackIds]]
+    const selectionExpr = ["in", ["get", "id"], ["literal", selectedTrackIds]]
     map.setPaintProperty("tracks-layer", "line-width", [
       "case",
-      isSelected,
+      selectionExpr,
       TRACK_WIDTH_SELECTED,
       TRACK_WIDTH_DEFAULT,
     ])
     map.setPaintProperty("tracks-layer", "line-opacity", [
       "case",
-      isSelected,
+      selectionExpr,
       TRACK_OPACITY_SELECTED,
       TRACK_OPACITY_DIM,
     ])

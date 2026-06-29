@@ -11,7 +11,6 @@ import { PhotoErrorDialog } from "~/components/PhotoErrorDialog"
 import { ParseErrorDialog } from "~/components/ParseErrorDialog"
 import { TrackStatsPanel } from "~/components/TrackStatsPanel"
 import { ShareDialog } from "~/components/ShareDialog"
-import { CompositeShareDialog } from "~/components/CompositeShareDialog"
 import { PhotoCard } from "~/components/PhotoCard"
 import { ErrorBoundary, ErrorCard } from "~/components/ErrorBoundary"
 import {
@@ -287,7 +286,6 @@ export default function Home() {
   const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
   const [pendingTrackId, setPendingTrackId] = useState<string | null>(null)
   const [showShareDialog, setShowShareDialog] = useState(false)
-  const [showCompositeShareDialog, setShowCompositeShareDialog] = useState(false)
   const [photos, setPhotos] = useState<PhotoEntry[]>(_restoredPhotos)
   const [showPhotos, setShowPhotos] = useState(true)
   const [selectedGroup, setSelectedGroup] = useState<PhotoGroup | null>(null)
@@ -465,7 +463,6 @@ export default function Home() {
       setSelectedTrackIds([])
       setPendingTrackId(null)
       setShowShareDialog(false)
-      setShowCompositeShareDialog(false)
       setPhotos([])
       setSelectedGroup(null)
       setPerTrackUniqueKm(new Map())
@@ -474,7 +471,6 @@ export default function Home() {
       setSelectedTrackIds([])
       setPendingTrackId(null)
       setShowShareDialog(false)
-      setShowCompositeShareDialog(false)
       setTrackCount(data.trackCount)
       setPerTrackUniqueKm(computePerTrackUniqueDistances(mapStore.tracks))
       if (data.trackCount > 0) {
@@ -687,27 +683,15 @@ export default function Home() {
                     { replace: true }
                   )
                 }}
-                onShare={
-                  selectedTracks.length === 1
-                    ? () => setShowShareDialog(true)
-                    : () => setShowCompositeShareDialog(true)
-                }
+                onShare={() => setShowShareDialog(true)}
                 onDelete={selectedTracks.length === 1 ? () => handleDeleteTrack(selectedTracks[0].id) : undefined}
               />
             </ErrorBoundary>
           )}
-          {showShareDialog && selectedTracks.length === 1 && (
+          {showShareDialog && selectedTracks.length > 0 && (
             <ShareDialog
               open={showShareDialog}
               onOpenChange={setShowShareDialog}
-              track={selectedTracks[0]}
-              photos={photos}
-            />
-          )}
-          {showCompositeShareDialog && selectedTracks.length > 1 && (
-            <CompositeShareDialog
-              open={showCompositeShareDialog}
-              onOpenChange={setShowCompositeShareDialog}
               tracks={selectedTracks}
               uniqueKms={perTrackUniqueKm}
               photos={photos}
